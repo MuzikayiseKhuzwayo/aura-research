@@ -1,0 +1,166 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #0b0f19;
+  --bg-secondary: #111827;
+  --bg-card: rgba(17, 24, 39, 0.7);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(99, 102, 241, 0.4);
+  
+  --accent-primary: #6366f1; /* Indigo */
+  --accent-secondary: #4f46e5;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  
+  --status-ready: #38bdf8; /* Light Blue */
+  --status-drafted: #a855f7; /* Purple */
+  --status-sent: #eab308; /* Amber */
+  --status-replied: #10b981; /* Emerald */
+  --status-ignored: #ef4444; /* Red */
+  
+  --font-sans: 'Outfit', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 40%);
+  background-attachment: fixed;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Glassmorphism Classes */
+.glass {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.glass-interactive {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-interactive:hover {
+  border-color: rgba(99, 102, 241, 0.25);
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Badge System */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-ready { background: rgba(56, 189, 248, 0.1); color: var(--status-ready); border: 1px solid rgba(56, 189, 248, 0.2); }
+.badge-drafted { background: rgba(168, 85, 247, 0.1); color: var(--status-drafted); border: 1px solid rgba(168, 85, 247, 0.2); }
+.badge-sent { background: rgba(234, 179, 8, 0.1); color: var(--status-sent); border: 1px solid rgba(234, 179, 8, 0.2); }
+.badge-replied { background: rgba(16, 185, 129, 0.1); color: var(--status-replied); border: 1px solid rgba(16, 185, 129, 0.2); }
+.badge-ignored { background: rgba(239, 68, 68, 0.1); color: var(--status-ignored); border: 1px solid rgba(239, 68, 68, 0.2); }
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.btn-tab {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 8px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-tab.active {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
