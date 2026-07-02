@@ -1,8 +1,16 @@
+<p align="center">
+  <img src="public/aura_logo.png" alt="Aura Logo Icon" width="120" />
+</p>
+
 # Aura Partner Research
 
 Aura Partner Research is a B2B partner discovery, lead generation, and outreach workspace designed to automate developer intelligence and customize target communication. By combining automated search pipelines, LLM-powered context mapping, and multi-channel outreach capabilities, Aura helps teams locate, analyze, and build meaningful partnerships.
 
-![Aura Logo Icon](/aura_logo.png)
+## Platform Preview
+
+<p align="center">
+  <img src="public/aura_look.jpeg" alt="Aura Partner Research Interface" width="100%" />
+</p>
 
 ## Core Features
 
