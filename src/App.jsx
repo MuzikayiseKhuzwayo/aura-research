@@ -387,6 +387,56 @@ export default function App() {
     }
   };
 
+  const [autoDrafting, setAutoDrafting] = useState(false);
+
+  const handleAutoDraft = async () => {
+    if (autoDrafting) return;
+    const eligibleLeads = targets.filter(t => t.status === 'Ready' || t.status === 'Drafted');
+    if (eligibleLeads.length === 0) {
+      showToast('No targets in "Ready" or "Drafted" status to auto-draft.', 'info');
+      return;
+    }
+    setAutoDrafting(true);
+    showToast(`Starting sequential auto-draft sequence for ${eligibleLeads.length} targets...`, 'info');
+    let successCount = 0;
+    for (let i = 0; i < eligibleLeads.length; i++) {
+      const lead = eligibleLeads[i];
+      showToast(`[${i+1}/${eligibleLeads.length}] Auto-drafting email for ${lead.name}...`, 'info');
+      try {
+        const genRes = await fetch(`${API_BASE}/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: lead.id, channel: 'email' })
+        });
+        if (!genRes.ok) throw new Error('Generation failed');
+        const genData = await genRes.json();
+        
+        handleUpdateDraft(lead.id, 'email', genData.draft);
+        
+        const pushRes = await fetch(`${API_BASE}/leads/send-privateemail-draft`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: lead.id })
+        });
+        if (!pushRes.ok) throw new Error('Failed to push draft to server');
+        
+        setTargets(prev => prev.map(t => {
+          if (t.id === lead.id) {
+            return { ...t, status: 'Sent', drafts: { ...t.drafts, email: genData.draft } };
+          }
+          return t;
+        }));
+        successCount++;
+      } catch (err) {
+        console.error(err);
+        showToast(`Failed to process ${lead.name}: ${err.message}`, 'error');
+      }
+    }
+    setAutoDrafting(false);
+    showToast(`Auto-draft run complete! Successfully synced ${successCount} drafts to mail server.`, 'success');
+    fetchLeads(false);
+  };
+
   const activeProfile = profiles.find(p => p.id === activeProfileId) || {};
 
   const sortedProfiles = [...profiles].sort((a, b) => {
@@ -559,6 +609,19 @@ export default function App() {
                 }}
               >
                 {researching ? 'Scraping Targets...' : 'Run Search Pipeline'}
+              </button>
+              <button 
+                id="btn-auto-draft"
+                className="btn-primary" 
+                onClick={handleAutoDraft}
+                disabled={autoDrafting}
+                style={{ 
+                  fontSize: '0.85rem', 
+                  boxShadow: autoDrafting ? 'none' : '0 4px 14px rgba(16, 185, 129, 0.4)',
+                  background: autoDrafting ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                }}
+              >
+                {autoDrafting ? 'Drafting Emails...' : 'Auto-Draft Emails'}
               </button>
               <button id="btn-refresh-leads" className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => fetchLeads(true)}>
                 Refresh Leads
