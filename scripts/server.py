@@ -53,6 +53,9 @@ def load_profiles_data() -> dict:
                 "backtesting-engine stars:>10",
                 "quant-trading stars:>10"
             ],
+            "search_queries_maps": [
+                "software agencies in San Francisco"
+            ],
             "search_interval_seconds": 7200,
             "email_config": {
                 "provider": "privateemail",
@@ -86,7 +89,17 @@ def load_profiles_data() -> dict:
                 json.dump([], f)
                 
     with open(PROFILES_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+        # Ensure search_queries_maps is present for all profiles
+        dirty = False
+        for p in data.get("profiles", []):
+            if "search_queries_maps" not in p:
+                p["search_queries_maps"] = ["software agencies in San Francisco"]
+                dirty = True
+        if dirty:
+            with open(PROFILES_PATH, "w", encoding="utf-8") as wf:
+                json.dump(data, wf, indent=2)
+        return data
 
 def save_profiles_data(data: dict):
     with open(PROFILES_PATH, "w", encoding="utf-8") as f:
@@ -286,6 +299,7 @@ class ProfileConfigModel(BaseModel):
     system_prompt_outreach: str
     search_queries_ai: list[str]
     search_queries_quant: list[str]
+    search_queries_maps: list[str] = []
     search_interval_seconds: int
     email_config: EmailConfigModel
 
@@ -296,6 +310,7 @@ class UpdateLeadRequest(BaseModel):
     id: str
     status: str
     custom_notes: str
+    channels: dict = None
 
 class SaveDraftRequest(BaseModel):
     id: str
@@ -465,6 +480,7 @@ def create_profile(req: CreateProfileModel):
         ),
         "search_queries_ai": ["ai-agents stars:>5"],
         "search_queries_quant": ["backtesting stars:>5"],
+        "search_queries_maps": ["software agencies in San Francisco"],
         "search_interval_seconds": 7200,
         "email_config": {
             "provider": "gmail",
@@ -518,6 +534,7 @@ def save_profile_config(profile_id: str, config: ProfileConfigModel):
             p["system_prompt_outreach"] = config.system_prompt_outreach
             p["search_queries_ai"] = config.search_queries_ai
             p["search_queries_quant"] = config.search_queries_quant
+            p["search_queries_maps"] = config.search_queries_maps
             p["search_interval_seconds"] = config.search_interval_seconds
             p["email_config"] = config.email_config.model_dump()
             found = True
@@ -544,6 +561,8 @@ def update_lead(req: UpdateLeadRequest):
                 })
             lead["status"] = req.status
             lead["custom_notes"] = req.custom_notes
+            if req.channels is not None:
+                lead["channels"] = req.channels
             found = True
             break
     if not found:
@@ -646,6 +665,104 @@ def trigger_research():
             leads = list(lead_map.values())
             save_leads(leads)
             os.remove(temp_targets_path)
+
+        # Run Google Maps Discovery via Gemini + Google Search Grounding Tool
+        maps_queries = profile.get("search_queries_maps", []) if profile else []
+        maps_leads = []
+        import urllib.parse
+        if api_key and maps_queries:
+            try:
+                print(f"Querying Google Search Grounding for local businesses using maps_queries: {maps_queries}")
+                client = genai.Client(api_key=api_key)
+                for m_query in maps_queries:
+                    if not m_query.strip():
+                        continue
+                    
+                    class LocalBusiness(BaseModel):
+                        name: str = Field(..., description="Name of the business or organization")
+                        website: str = Field("", description="Website URL or official page of the business")
+                        phone: str = Field("", description="Phone number of the business")
+                        address: str = Field("", description="Physical street address or city location of the business")
+                        description: str = Field(..., description="A short summary of what this business does")
+                        jargon: str = Field(..., description="2-3 industry keywords or tech jargon relevant to their business")
+                        pain_points: str = Field(..., description="Typical technical or operational pain points for this B2B profile")
+
+                    class LocalBusinessList(BaseModel):
+                        businesses: list[LocalBusiness]
+
+                    prompt = (
+                        f"Perform a search on Google Maps / Google Search to find top local businesses matching the query: '{m_query}'.\n"
+                        f"Return a structured list of at least 3 to 5 real businesses matching this query with complete details."
+                    )
+
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            tools=[types.Tool(google_search=types.GoogleSearch())],
+                            response_mime_type="application/json",
+                            response_schema=LocalBusinessList,
+                        )
+                    )
+                    if response.text:
+                        parsed = json.loads(response.text)
+                        for bus in parsed.get("businesses", []):
+                            bus_id = "maps_" + bus["name"].lower().replace(" ", "_").replace("'", "").replace('"', "")
+                            maps_leads.append({
+                                "id": bus_id,
+                                "name": bus["name"],
+                                "role": "Local Business Lead",
+                                "firm": bus["name"],
+                                "location": bus["address"] or "Local",
+                                "segment": "Local Search (Google Maps)",
+                                "channels": {
+                                    "email": "",
+                                    "linkedin": f"https://linkedin.com/search/results/all/?keywords={urllib.parse.quote(bus['name'])}",
+                                    "x": "",
+                                    "github": "",
+                                    "twitter_handle": "",
+                                    "website": bus["website"]
+                                },
+                                "technical_signals": {
+                                    "observed_need": f"Local business identified via Google Maps. Service description: {bus['description']}",
+                                    "sample_dataset_type": profile.get("give_first_asset", "Custom introductory overview"),
+                                    "recent_filing_or_post": f"Located at: {bus['address']}. Phone: {bus['phone']}"
+                                },
+                                "status": "Ready",
+                                "custom_notes": f"Observed via Google Maps query: {m_query}",
+                                "raw_metadata": {
+                                    "address": bus["address"],
+                                    "phone": bus["phone"],
+                                    "description": bus["description"],
+                                    "jargon": bus["jargon"],
+                                    "pain_points": bus["pain_points"]
+                                },
+                                "drafts": {
+                                    "email": "",
+                                    "linkedin": "",
+                                    "x": ""
+                                },
+                                "history": []
+                            })
+            except Exception as e:
+                print(f"Error querying Google Maps through Gemini Search: {e}")
+                
+        # Merge maps_leads into lead database
+        if maps_leads:
+            lead_map = {l["id"]: l for l in leads}
+            for ml in maps_leads:
+                mid = ml["id"]
+                if mid not in lead_map:
+                    lead_map[mid] = ml
+                else:
+                    existing = lead_map[mid]
+                    ml["status"] = existing.get("status", "Ready")
+                    ml["custom_notes"] = existing.get("custom_notes", "")
+                    ml["drafts"] = existing.get("drafts", {"email": "", "linkedin": "", "x": ""})
+                    ml["history"] = existing.get("history", [])
+                    lead_map[mid] = ml
+            leads = list(lead_map.values())
+            save_leads(leads)
             
         return leads
     except Exception as e:

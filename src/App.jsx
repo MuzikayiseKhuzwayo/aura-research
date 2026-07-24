@@ -52,6 +52,7 @@ export default function App() {
   const [promptOutreach, setPromptOutreach] = useState('');
   const [queriesAi, setQueriesAi] = useState('');
   const [queriesQuant, setQueriesQuant] = useState('');
+  const [queriesMaps, setQueriesMaps] = useState('');
   const [intervalSecs, setIntervalSecs] = useState(7200);
   const [emailProvider, setEmailProvider] = useState('gmail');
   const [emailAddress, setEmailAddress] = useState('');
@@ -97,6 +98,7 @@ export default function App() {
     setPromptOutreach(profile.system_prompt_outreach || '');
     setQueriesAi((profile.search_queries_ai || []).join(', '));
     setQueriesQuant((profile.search_queries_quant || []).join(', '));
+    setQueriesMaps((profile.search_queries_maps || []).join(', '));
     setIntervalSecs(profile.search_interval_seconds || 7200);
     
     const email = profile.email_config || {};
@@ -206,6 +208,7 @@ export default function App() {
         system_prompt_outreach: promptOutreach,
         search_queries_ai: queriesAi.split(',').map(q => q.trim()).filter(Boolean),
         search_queries_quant: queriesQuant.split(',').map(q => q.trim()).filter(Boolean),
+        search_queries_maps: queriesMaps.split(',').map(q => q.trim()).filter(Boolean),
         search_interval_seconds: parseInt(intervalSecs, 10),
         email_config: {
           provider: emailProvider,
@@ -321,17 +324,17 @@ export default function App() {
     }));
   };
 
-  const syncLeadUpdate = async (id, status, notes) => {
+  const syncLeadUpdate = async (id, status, notes, channels = null) => {
     try {
       const res = await fetch(`${API_BASE}/leads/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status, custom_notes: notes })
+        body: JSON.stringify({ id, status, custom_notes: notes, channels })
       });
       if (!res.ok) throw new Error('Failed to update lead');
       setTargets(prev => prev.map(t => {
         if (t.id === id) {
-          return { ...t, status, custom_notes: notes };
+          return { ...t, status, custom_notes: notes, channels: channels || t.channels };
         }
         return t;
       }));
@@ -343,12 +346,17 @@ export default function App() {
 
   const handleUpdateNotes = (notes) => {
     if (!selectedLead) return;
-    syncLeadUpdate(selectedLeadId, selectedLead.status, notes);
+    syncLeadUpdate(selectedLeadId, selectedLead.status, notes, selectedLead.channels);
   };
 
   const handleUpdateStatus = (status) => {
     if (!selectedLead) return;
-    syncLeadUpdate(selectedLeadId, status, selectedLead.custom_notes);
+    syncLeadUpdate(selectedLeadId, status, selectedLead.custom_notes, selectedLead.channels);
+  };
+
+  const handleUpdateChannels = (channels) => {
+    if (!selectedLead) return;
+    syncLeadUpdate(selectedLeadId, selectedLead.status, selectedLead.custom_notes, channels);
   };
 
   const handleSynthesizeIntelligence = async (id) => {
@@ -722,17 +730,32 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>
-                        Interval Timing (seconds between automated crawls)
-                      </label>
-                      <input 
-                        id="input-interval-secs"
-                        type="number"
-                        value={intervalSecs}
-                        onChange={(e) => setIntervalSecs(e.target.value)}
-                        style={{ width: '200px', padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
-                      />
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>
+                          Google Maps Location Searches (comma separated)
+                        </label>
+                        <input 
+                          id="input-queries-maps"
+                          type="text"
+                          value={queriesMaps}
+                          onChange={(e) => setQueriesMaps(e.target.value)}
+                          placeholder="e.g. software agencies in San Francisco, AI companies in Austin"
+                          style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>
+                          Interval Timing (seconds between crawls)
+                        </label>
+                        <input 
+                          id="input-interval-secs"
+                          type="number"
+                          value={intervalSecs}
+                          onChange={(e) => setIntervalSecs(e.target.value)}
+                          style={{ width: '200px', padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>
