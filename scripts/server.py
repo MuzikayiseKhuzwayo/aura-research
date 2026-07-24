@@ -690,21 +690,35 @@ def trigger_research():
                     class LocalBusinessList(BaseModel):
                         businesses: list[LocalBusiness]
 
-                    prompt = (
-                        f"Perform a search on Google Maps / Google Search to find top local businesses matching the query: '{m_query}'.\n"
-                        f"Return a structured list of at least 3 to 5 real businesses matching this query with complete details."
+                    # Step 1: Grounded search to retrieve raw business data
+                    search_prompt = (
+                        f"Search Google Maps / Google Search to find top local businesses matching the query: '{m_query}'.\n"
+                        f"Extract their names, website URLs, phone numbers, street addresses, and a short description of what they do."
                     )
-
-                    response = client.models.generate_content(
+                    search_response = client.models.generate_content(
                         model="gemini-2.5-flash",
-                        contents=prompt,
+                        contents=search_prompt,
                         config=types.GenerateContentConfig(
                             tools=[types.Tool(google_search=types.GoogleSearch())],
-                            response_mime_type="application/json",
-                            response_schema=LocalBusinessList,
                         )
                     )
-                    if response.text:
+
+                    # Step 2: Format raw text into structured JSON list
+                    response = None
+                    if search_response.text:
+                        format_prompt = (
+                            f"Format the following search results into a structured JSON list matching the schema:\n"
+                            f"\"\"\"\n{search_response.text}\n\"\"\""
+                        )
+                        response = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=format_prompt,
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json",
+                                response_schema=LocalBusinessList,
+                            )
+                        )
+                    if response and response.text:
                         parsed = json.loads(response.text)
                         for bus in parsed.get("businesses", []):
                             bus_id = "maps_" + bus["name"].lower().replace(" ", "_").replace("'", "").replace('"', "")
