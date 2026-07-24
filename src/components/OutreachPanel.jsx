@@ -3,7 +3,7 @@ import { Copy, Check, ExternalLink, Mail, Linkedin, Twitter } from './Icons';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
 
-export default function OutreachPanel({ lead, onUpdateStatus, onUpdateDraft }) {
+export default function OutreachPanel({ lead, onUpdateStatus, onUpdateDraft, showToast }) {
   const [activeTab, setActiveTab] = useState('email'); // 'email', 'linkedin', 'x'
   const [copied, setCopied] = useState(false);
   const [editedText, setEditedText] = useState('');
@@ -81,7 +81,7 @@ export default function OutreachPanel({ lead, onUpdateStatus, onUpdateDraft }) {
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to connect to AI server. Generating offline template...');
+      if (showToast) showToast('Failed to connect to AI server. Generating offline template...', 'error');
       const fallback = `[Fallback Copy]\nHi ${lead.name.split(' ')[0]},\nsaw your recent work. Would love to send a sample dataset. Let me know!`;
       setEditedText(fallback);
       onUpdateDraft(lead.id, activeTab, fallback);
@@ -151,11 +151,11 @@ export default function OutreachPanel({ lead, onUpdateStatus, onUpdateDraft }) {
       
       setPushed(true);
       onUpdateStatus('Sent');
-      alert('Draft saved successfully to PrivateEmail Drafts folder!');
+      if (showToast) showToast('Draft saved successfully to PrivateEmail Drafts folder!', 'success');
       setTimeout(() => setPushed(false), 3000);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Error saving draft to PrivateEmail server. Make sure you set your password in the .env file.');
+      if (showToast) showToast(err.message || 'Error saving draft to PrivateEmail server. Check settings.', 'error');
     } finally {
       setPushing(false);
     }

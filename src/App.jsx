@@ -32,6 +32,15 @@ export default function App() {
     });
   };
 
+  const [toasts, setToasts] = useState([]);
+  const showToast = (message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
   const [targets, setTargets] = useState([]);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [filterStatus, setFilterStatus] = useState('All Statuses');
@@ -163,7 +172,7 @@ export default function App() {
       setError(null);
     } catch (err) {
       console.error(err);
-      alert('Error switching profile.');
+      showToast('Error switching profile.', 'error');
     } finally {
       setLoading(false);
     }
@@ -190,7 +199,7 @@ export default function App() {
       await handleSelectProfile(result.profile.id);
     } catch (err) {
       console.error(err);
-      alert('Error creating profile');
+      showToast('Error creating profile.', 'error');
     }
   };
 
@@ -230,10 +239,10 @@ export default function App() {
       
       // Refresh local profiles structure
       await fetchProfiles();
-      alert('Profile configuration saved successfully!');
+      showToast('Profile configuration saved successfully!', 'success');
     } catch (err) {
       console.error(err);
-      alert('Error saving configuration.');
+      showToast('Error saving configuration.', 'error');
     } finally {
       setSavingSettings(false);
     }
@@ -254,7 +263,7 @@ export default function App() {
       setTargetsIcp(data.enhanced_icp);
     } catch (err) {
       console.error(err);
-      alert('Error calling AI enhancer.');
+      showToast('Error calling AI enhancer.', 'error');
     } finally {
       setEnhancingIcp(false);
     }
@@ -276,7 +285,7 @@ export default function App() {
       setTargetsIcp(data.refined_targets_icp || targetsIcp);
     } catch (err) {
       console.error(err);
-      alert('Error calling AI refiner.');
+      showToast('Error calling AI refiner.', 'error');
     } finally {
       setRefiningProfile(false);
     }
@@ -296,10 +305,10 @@ export default function App() {
       if (updatedLeads.length > 0) {
         setSelectedLeadId(updatedLeads[0].id);
       }
-      alert(`Research complete! Found and merged new active targets.`);
+      showToast('Research complete! Found and merged new active targets.', 'success');
     } catch (err) {
       console.error(err);
-      alert('Error executing crawler. Ensure your internet connection is active.');
+      showToast('Error executing crawler. Ensure your internet connection is active.', 'error');
     } finally {
       setResearching(false);
     }
@@ -340,7 +349,7 @@ export default function App() {
       }));
     } catch (err) {
       console.error(err);
-      alert('Error updating lead status.');
+      showToast('Error updating lead status.', 'error');
     }
   };
 
@@ -374,7 +383,7 @@ export default function App() {
       }));
     } catch (err) {
       console.error(err);
-      alert('Error running lead intelligence synthesis.');
+      showToast('Error running lead intelligence synthesis.', 'error');
     }
   };
 
@@ -974,6 +983,7 @@ export default function App() {
                     lead={selectedLead} 
                     onUpdateStatus={handleUpdateStatus} 
                     onUpdateDraft={handleUpdateDraft}
+                    showToast={showToast}
                   />
                 ) : (
                   <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -985,6 +995,27 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* Toast Container */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            className={`px-4 py-3 rounded-lg shadow-xl text-sm font-medium border flex items-center gap-2 animate-slide-in pointer-events-auto max-w-sm transition-all duration-300 ${
+              t.type === 'error'
+                ? 'bg-[#1e1416]/95 text-[#f87171] border-[#ef4444]/20'
+                : t.type === 'success'
+                ? 'bg-[#101b15]/95 text-[#34d399] border-[#10b981]/20'
+                : 'bg-[#151922]/95 text-[#60a5fa] border-[#3b82f6]/20'
+            }`}
+          >
+            <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+              backgroundColor: t.type === 'error' ? '#ef4444' : t.type === 'success' ? '#10b981' : '#3b82f6'
+            }} />
+            <span>{t.message}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

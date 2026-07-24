@@ -14,7 +14,7 @@
 - [x] Implement Gemini Google Search Grounding pipeline to fetch local places (`server.py`)
 - [x] Add Google Maps query management UI to settings tab 2 in frontend (`App.jsx`)
 - [x] Test and build the updated backend & frontend
-- [ ] Implement `resolve_lead_email_via_grounding` email scraping helper in `server.py`
-- [ ] Integrate context-aware profile business details and ICP settings into `run_synthesis_logic`
-- [ ] Replace static `SEGMENT_TEMPLATES` with dynamic config fallbacks in `generate_outreach`
-- [ ] Implement lead filtering/deletion logic for contact-less leads in server pipeline
+- [x] Implement `resolve_lead_email_via_grounding` email scraping helper in `server.py`
+- [x] Integrate context-aware profile business details and ICP settings into `run_synthesis_logic`
+- [x] Replace static `SEGMENT_TEMPLATES` with dynamic config fallbacks in `generate_outreach`
+- [x] Implement lead filtering/deletion logic for contact-less leads in server pipeline
