@@ -958,6 +958,7 @@ export default function App() {
                     lead={selectedLead} 
                     onUpdateNotes={handleUpdateNotes} 
                     onSynthesize={handleSynthesizeIntelligence}
+                    onUpdateChannels={handleUpdateChannels}
                   />
                 ) : (
                   <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>

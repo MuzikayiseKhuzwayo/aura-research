@@ -196,89 +196,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Dynamic Segment-Specific Context & Fallbacks Mapping
-SEGMENT_TEMPLATES = {
-    "Quantitative Hedge Funds & Systematic Trading Desks": {
-        "persona": "an expert quantitative research engineer",
-        "pain_points": "Noisy alternative data, look-ahead bias in backtests, lack of point-in-time consistency, over-reliance on surface-level sentiment.",
-        "jargon": "point-in-time Parquet exports via PyArrow, alpha signals, systemic backtesting, Cypher-based POSITIONS_ON / EXPOSED_TO graph traversals, Polymarket whale profiles, Inference Conviction Index (ICI).",
-        "value_proposition": "We provide clean, causally justified, structured consensus and narrative data feeds to differentiate your strategy from the hype-chasing crowd.",
-        "default_asset": "s3://dubstrata-public-samples/tsmc-supply-chain.parquet",
-        "email_fallback": (
-            "Subject: Event sentiment and point-in-time backtesting data\n\n"
-            "{first_name},\n\n"
-            "We processed the latest alternative event records matching your quantitative research context.\n\n"
-            "I put together a clean, point-in-time Parquet dataset representing TSMC's lower-tier supplier exposures to backtest. No signups or calls. "
-            "I've uploaded the sample to: {asset}. Would you like the access credentials?\n\n"
-            "Best,\n[Your Name]"
-        ),
-        "dm_fallback": (
-            "{first_name}, saw your work on systematic event sentiment. We built a point-in-time Parquet dataset "
-            "mapping TSMC's supply chain exposures to test against backtests—no login or pitch required. "
-            "The sample is on S3 at {asset}. Let me know if you want the access keys."
-        )
-    },
-    "Traditional Asset Managers & Macro Analysts": {
-        "persona": "a senior investment intelligence analyst",
-        "pain_points": "Causal mapping gaps, mapping macro factors (Event A -> Entity B -> Asset C), manual extraction of policy shifts, weeding out speculative noise.",
-        "jargon": "causal knowledge graphs, supply chain risk cascades, geopolitical arbitrage, Open-Meteo synchronous integration, FDA approval trackers, causal contradiction engine, Deep Research Intelligence Report.",
-        "value_proposition": "We map global event narratives directly to asset exposure nodes to provide reliable, verifiable consensus data.",
-        "default_asset": "a draft of our Deep Research Intelligence Report on supply-chain bottlenecks",
-        "email_fallback": (
-            "Subject: Causal macro analysis: TSMC supply chain risk cascade\n\n"
-            "{first_name},\n\n"
-            "We built a causal mapping tracing how specific regulatory shifts and geopolitical delays in Asia cascade down to exposed US equities.\n\n"
-            "I pulled a tailored PDF version of our Deep Research Intelligence Report mapping these dependencies directly to your portfolio context. "
-            "No sales pitches—just a clean causal breakdown. Can I send over the link to the draft?\n\n"
-            "Best,\n[Your Name]"
-        ),
-        "dm_fallback": (
-            "{first_name}, saw your macro work. We mapped how East Asian geopolitical actions cascade down to US hardware stocks. "
-            "No generic vectors—it's a clean causal graph breakdown. I compiled this into a Deep Research Intelligence Report "
-            "({asset}). Open to taking a look?"
-        )
-    },
-    "Corporate Risk Officers & Compliance Directors": {
-        "persona": "a risk management architect",
-        "pain_points": "Supply chain vulnerabilities, lack of compliance transparency across decentralized custody, audit trail complexity for multi-tier vendors.",
-        "jargon": "low-tier supplier exposures, cryptographic auditing, immutable agent_identity_logs, entity salience categories, tenant-isolated private graph overlays.",
-        "value_proposition": "We deliver compliance-aligned alternative data feeds with zero-trust logical provenance and auditability.",
-        "default_asset": "our secure compliance schema audit and sample ledger logs",
-        "email_fallback": (
-            "Subject: Cryptographic auditing and multi-tier supplier risks\n\n"
-            "{first_name},\n\n"
-            "We've structured a pipeline for mapping low-tier supply dependencies while maintaining rigorous tenant isolation.\n\n"
-            "I put together a sample export of our immutable compliance logs and ledger schemas showing how we track vendor vulnerabilities without exposing sensitive internal data. "
-            "No meeting required. Would you be interested in checking out the schema?\n\n"
-            "Best,\n[Your Name]"
-        ),
-        "dm_fallback": (
-            "{first_name}, tracking your focus on corporate supply chain compliance. We mapped low-tier supplier dependencies "
-            "using an isolated private graph overlay with immutable agent logs to preserve non-repudiation. "
-            "I put together a sample ledger schema and risk overview ({asset}). Can I drop you the file to review?"
-        )
-    },
-    "Autonomous AI Agent Developers & Web3/DeFi Protocol Teams": {
-        "persona": "a Web3 core systems engineer",
-        "pain_points": "Bypassing SaaS credit card limits for autonomous agents, high API overhead on idle web searches, data access interfaces for agents.",
-        "jargon": "Model Context Protocol (MCP) servers, x402 Micropayments gateway, Solana USDC micro-billing, Ed25519 wallet rotation, Zero-Fee JIT crawler protection.",
-        "value_proposition": "We provide real-time causal truth data feeds seamlessly integrated with open-source Model Context Protocol (MCP) servers.",
-        "default_asset": "https://github.com/dubstrata/dubstrata-mcp",
-        "email_fallback": (
-            "Subject: Open-source Model Context Protocol server for AI agents\n\n"
-            "{first_name},\n\n"
-            "We solved subscription credit card limitations for autonomous agents using Solana USDC micropayments.\n\n"
-            "We open-sourced a Model Context Protocol (MCP) server that lets agents query our financial knowledge graph and pay dynamically per row. "
-            "The repo is public at {asset}. Would you be open to taking a look?\n\n"
-            "Best,\n[Your Name]"
-        ),
-        "dm_fallback": (
-            "{first_name}, saw your repo on agent funds. We built a public MCP server ({asset}) "
-            "that lets agents pay dynamically per row using Solana/USDC signatures to bypass SaaS sub limits. "
-            "Takes 2 minutes to run locally. Open to taking a look?"
-        )
-    }
-}
+# Dynamic segment templates removed to support profile-grounded generations.
 
 # Pydantic models for Profile update
 class EmailConfigModel(BaseModel):
@@ -362,22 +280,7 @@ class RefineProfileRequest(BaseModel):
     targets_icp: str
     business_context: str
 
-def get_segment_config(segment_name: str) -> dict:
-    if not segment_name:
-        return SEGMENT_TEMPLATES["Quantitative Hedge Funds & Systematic Trading Desks"]
-    segment_name_lower = segment_name.lower()
-    for key, config in SEGMENT_TEMPLATES.items():
-        if segment_name_lower in key.lower() or key.lower() in segment_name_lower:
-            return config
-    if "quant" in segment_name_lower or "hedge" in segment_name_lower or "trading" in segment_name_lower:
-        return SEGMENT_TEMPLATES["Quantitative Hedge Funds & Systematic Trading Desks"]
-    elif "asset" in segment_name_lower or "pm" in segment_name_lower or "macro" in segment_name_lower or "analyst" in segment_name_lower:
-        return SEGMENT_TEMPLATES["Traditional Asset Managers & Macro Analysts"]
-    elif "risk" in segment_name_lower or "compliance" in segment_name_lower or "corporate" in segment_name_lower:
-        return SEGMENT_TEMPLATES["Corporate Risk Officers & Compliance Directors"]
-    elif "agent" in segment_name_lower or "web3" in segment_name_lower or "defi" in segment_name_lower or "developer" in segment_name_lower:
-        return SEGMENT_TEMPLATES["Autonomous AI Agent Developers & Web3/DeFi Protocol Teams"]
-    return SEGMENT_TEMPLATES["Quantitative Hedge Funds & Systematic Trading Desks"]
+# Obsolete segment helper removed.
 
 @app.get("/api/leads")
 def get_leads_api():
@@ -570,6 +473,37 @@ def update_lead(req: UpdateLeadRequest):
     save_leads(leads)
     return {"status": "success"}
 
+def resolve_lead_email_via_grounding(firm_name: str, website: str, api_key: str) -> str:
+    if not api_key or not website:
+        return ""
+    try:
+        print(f"Scraping/searching web for contact email of firm '{firm_name}' on website '{website}'...")
+        client = genai.Client(api_key=api_key)
+        prompt = (
+            f"Find the public contact email, support email, or inquiry email address for the business/firm named '{firm_name}' "
+            f"associated with the website '{website}'.\n"
+            f"You MUST use Google Search to find this email from their website or public listings.\n"
+            f"If found, return only the plain text email address (e.g., info@firm.com). If no email is found, return 'Not Found'."
+        )
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+            )
+        )
+        if response.text:
+            text = response.text.strip()
+            if "@" in text and "." in text:
+                words = text.split()
+                for w in words:
+                    if "@" in w and "." in w:
+                        cleaned = w.strip("().,;:\"'")
+                        return cleaned
+    except Exception as e:
+        print(f"Error resolving email via grounding: {e}")
+    return ""
+
 @app.post("/api/leads/trigger-research")
 def trigger_research():
     profiles_data = load_profiles_data()
@@ -652,6 +586,18 @@ def trigger_research():
             lead_map = {l["id"]: l for l in leads}
             for sl in scraped_leads:
                 sid = sl["id"]
+                
+                # Resolve email if missing and website is present
+                if not sl.get("channels", {}).get("email", "").strip() and sl.get("channels", {}).get("website", "").strip():
+                    email_addr = resolve_lead_email_via_grounding(sl["firm"], sl["channels"]["website"], api_key)
+                    if email_addr:
+                        sl["channels"]["email"] = email_addr
+                
+                # Discard lead if no contact email is present
+                if not sl.get("channels", {}).get("email", "").strip():
+                    print(f"Filtering out lead '{sl['name']}' - no email contact available.")
+                    continue
+
                 if sid not in lead_map:
                     lead_map[sid] = sl
                 else:
@@ -766,6 +712,18 @@ def trigger_research():
             lead_map = {l["id"]: l for l in leads}
             for ml in maps_leads:
                 mid = ml["id"]
+                
+                # Resolve email if missing and website is present
+                if not ml.get("channels", {}).get("email", "").strip() and ml.get("channels", {}).get("website", "").strip():
+                    email_addr = resolve_lead_email_via_grounding(ml["firm"], ml["channels"]["website"], api_key)
+                    if email_addr:
+                        ml["channels"]["email"] = email_addr
+                
+                # Discard lead if no contact email is present
+                if not ml.get("channels", {}).get("email", "").strip():
+                    print(f"Filtering out Maps lead '{ml['name']}' - no email contact available.")
+                    continue
+
                 if mid not in lead_map:
                     lead_map[mid] = ml
                 else:
@@ -947,13 +905,22 @@ def run_synthesis_logic(lead, api_key, leads):
         profile.get("system_prompt_synthesis") if profile else 
         "You are an AI research assistant. Analyze the repository details to synthesize B2B partner insights."
     )
-    system_instruction += "\nProduce structured intelligence matching the response schema."
+    system_instruction += "\nProduce structured B2B intelligence matching the response schema, contextualized around our service context."
     
+    biz_context = profile.get("business_context", "We provide custom software/data solutions.") if profile else "We provide custom software/data solutions."
+    icp_context = profile.get("targets_icp", "Software developers and agencies") if profile else "Software developers and agencies"
+    give_first = profile.get("give_first_asset", "our custom introductory services") if profile else "our custom introductory services"
+
     prompt = (
-        f"Developer/Firm: {lead.get('name')} ({lead.get('firm')})\n"
-        f"Primary Language: {lang}\n"
-        f"Repository Name: {repo_name}\n"
-        f"Repository Description: {repo_desc}\n"
+        f"Our Business Context / Service Offering: '{biz_context}'\n"
+        f"Our Target ICP/Persona Definition: '{icp_context}'\n"
+        f"Our Custom Give-First Asset: '{give_first}'\n\n"
+        f"Recipient Developer/Firm: {lead.get('name')} ({lead.get('firm')})\n"
+        f"Primary Language/Stack: {lang}\n"
+        f"Repository/Business Name: {repo_name}\n"
+        f"Repository/Business Description: {repo_desc}\n\n"
+        f"Determine how this recipient fits our ICP, identify their observed pain points and technical jargon, "
+        f"and formulate a tailored value proposition representing our offering."
     )
     
     response = client.models.generate_content(
@@ -1014,20 +981,29 @@ def generate_outreach(req: GenerateRequest):
 
     if lead.get("technical_signals", {}).get("synthesized"):
         segment_config = {
-            "persona": f"outreach lead on behalf of {profile.get('name') if profile else 'Aura'}",
+            "persona": f"outreach lead on behalf of {profile.get('name') if profile else 'our team'}",
             "pain_points": lead["technical_signals"].get("pain_points", ""),
             "jargon": lead["technical_signals"].get("jargon", ""),
             "value_proposition": lead["technical_signals"].get("value_proposition", ""),
             "default_asset": lead["technical_signals"].get("sample_dataset_type", ""),
-            "email_fallback": "Subject: Custom data feed\n\nHi,\n\nWe structured a clean feed: {asset}.\n\nBest,\nTeam",
-            "dm_fallback": "Saw your project. We built a custom feed: {asset}."
+            "email_fallback": "Subject: Custom introductory asset\n\nHi,\n\nWe compiled a customized resource: {asset}.\n\nBest,\nTeam",
+            "dm_fallback": "Saw your project. We put together a custom resource: {asset}."
         }
         give_first_asset = lead["technical_signals"].get("sample_dataset_type", "")
         recent_signal = lead["technical_signals"].get("recent_filing_or_post", "")
     else:
-        segment_config = get_segment_config(lead.get("segment", ""))
+        # Dynamic profile-aligned fallback config
+        segment_config = {
+            "persona": f"outreach lead on behalf of {profile.get('name') if profile else 'our team'}",
+            "pain_points": profile.get("targets_icp", "B2B client requirements") if profile else "B2B client requirements",
+            "jargon": "industry practices",
+            "value_proposition": profile.get("business_context", "our professional services") if profile else "our professional services",
+            "default_asset": profile.get("give_first_asset", "our introductory resources") if profile else "our introductory resources",
+            "email_fallback": "Subject: Custom introductory asset\n\nHi,\n\nWe compiled a customized resource: {asset}.\n\nBest,\nTeam",
+            "dm_fallback": "Saw your project. We put together a custom resource: {asset}."
+        }
         give_first_asset = lead.get("technical_signals", {}).get("sample_dataset_type", "") or segment_config["default_asset"]
-        recent_signal = lead.get("technical_signals", {}).get("recent_filing_or_post", "recent analytical operations")
+        recent_signal = lead.get("technical_signals", {}).get("recent_filing_or_post", "recent business operations")
 
     system_instruction = (
         f"You are writing a cold outreach message on behalf of {profile.get('name') if profile else 'our team'}, acting as {segment_config['persona']}.\n"

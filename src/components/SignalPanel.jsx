@@ -1,10 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, ShieldAlert, Cpu, Mail, Globe, Github, MessageSquare, Check } from './Icons';
 
-export default function SignalPanel({ lead, onUpdateNotes, onSynthesize }) {
+export default function SignalPanel({ lead, onUpdateNotes, onSynthesize, onUpdateChannels }) {
   if (!lead) return null;
 
   const { technical_signals, custom_notes, channels, history } = lead;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFields, setEditFields] = useState({
+    email: '',
+    twitter_handle: '',
+    x: '',
+    website: '',
+    github: ''
+  });
+
+  useEffect(() => {
+    if (lead && lead.channels) {
+      setEditFields({
+        email: lead.channels.email || '',
+        twitter_handle: lead.channels.twitter_handle || '',
+        x: lead.channels.x || '',
+        website: lead.channels.website || '',
+        github: lead.channels.github || ''
+      });
+    }
+  }, [lead, isEditing]);
+
+  const handleFieldChange = (key, val) => {
+    setEditFields(prev => ({ ...prev, [key]: val }));
+  };
+
+  const handleSave = () => {
+    const updatedChannels = {
+      ...lead.channels,
+      email: editFields.email,
+      twitter_handle: editFields.twitter_handle,
+      x: editFields.x || (editFields.twitter_handle ? `https://x.com/${editFields.twitter_handle}` : lead.channels.x),
+      website: editFields.website,
+      github: editFields.github
+    };
+    onUpdateChannels(updatedChannels);
+    setIsEditing(false);
+  };
 
   const formatTime = (isoString) => {
     try {
@@ -54,16 +92,39 @@ export default function SignalPanel({ lead, onUpdateNotes, onSynthesize }) {
 
       {/* Contact & Channels Card */}
       <div className="glass" style={{ padding: '14px', backgroundColor: 'rgba(99, 102, 241, 0.03)', border: '1px solid rgba(99, 102, 241, 0.1)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <h3 style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--accent-primary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Contact & Channels
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+            Contact & Channels
+          </h3>
+          <button 
+            onClick={isEditing ? handleSave : () => setIsEditing(true)}
+            style={{
+              fontSize: '0.75rem',
+              padding: '2px 8px',
+              backgroundColor: isEditing ? '#10b981' : 'rgba(255,255,255,0.05)',
+              border: '1px solid var(--border-color)',
+              color: 'white',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            {isEditing ? 'Save' : 'Edit'}
+          </button>
+        </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px', fontSize: '0.85rem' }}>
           {/* Email */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Mail size={14} color="var(--text-secondary)" />
             <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Email:</span>
-            {channels.email ? (
+            {isEditing ? (
+              <input 
+                type="text" 
+                value={editFields.email}
+                onChange={(e) => handleFieldChange('email', e.target.value)}
+                style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '2px 6px', color: 'white', fontSize: '0.85rem', outline: 'none' }}
+              />
+            ) : channels.email ? (
               <a href={`mailto:${channels.email}`} style={{ color: 'var(--status-ready)', textDecoration: 'none', wordBreak: 'break-all' }} className="hover-link">
                 {channels.email}
               </a>
@@ -75,8 +136,16 @@ export default function SignalPanel({ lead, onUpdateNotes, onSynthesize }) {
           {/* Twitter / X */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <MessageSquare size={14} color="var(--text-secondary)" />
-            <span style={{ color: 'var(--text-secondary)', width: '60px' }}>X / Twitter:</span>
-            {channels.twitter_handle ? (
+            <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Twitter:</span>
+            {isEditing ? (
+              <input 
+                type="text" 
+                placeholder="Handle (without @)"
+                value={editFields.twitter_handle}
+                onChange={(e) => handleFieldChange('twitter_handle', e.target.value)}
+                style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '2px 6px', color: 'white', fontSize: '0.85rem', outline: 'none' }}
+              />
+            ) : channels.twitter_handle ? (
               <a href={channels.x} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--status-drafted)', textDecoration: 'none' }}>
                 @{channels.twitter_handle}
               </a>
@@ -91,7 +160,14 @@ export default function SignalPanel({ lead, onUpdateNotes, onSynthesize }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Globe size={14} color="var(--text-secondary)" />
             <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Website:</span>
-            {channels.website ? (
+            {isEditing ? (
+              <input 
+                type="text" 
+                value={editFields.website}
+                onChange={(e) => handleFieldChange('website', e.target.value)}
+                style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '2px 6px', color: 'white', fontSize: '0.85rem', outline: 'none' }}
+              />
+            ) : channels.website ? (
               <a href={channels.website.startsWith('http') ? channels.website : `https://${channels.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--status-sent)', textDecoration: 'none', wordBreak: 'break-all' }}>
                 {channels.website.replace(/https?:\/\/(www\.)?/, '')}
               </a>
@@ -104,9 +180,18 @@ export default function SignalPanel({ lead, onUpdateNotes, onSynthesize }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Github size={14} color="var(--text-secondary)" />
             <span style={{ color: 'var(--text-secondary)', width: '60px' }}>GitHub:</span>
-            <a href={channels.github} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--status-replied)', textDecoration: 'none', wordBreak: 'break-all' }}>
-              {channels.github.replace('https://github.com/', '')}
-            </a>
+            {isEditing ? (
+              <input 
+                type="text" 
+                value={editFields.github}
+                onChange={(e) => handleFieldChange('github', e.target.value)}
+                style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '2px 6px', color: 'white', fontSize: '0.85rem', outline: 'none' }}
+              />
+            ) : (
+              <a href={channels.github} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--status-replied)', textDecoration: 'none', wordBreak: 'break-all' }}>
+                {channels.github.replace('https://github.com/', '')}
+              </a>
+            )}
           </div>
         </div>
       </div>
