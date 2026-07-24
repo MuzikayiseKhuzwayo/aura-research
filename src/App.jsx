@@ -997,21 +997,13 @@ export default function App() {
       </main>
 
       {/* Toast Container */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="aura-toast-container">
         {toasts.map(t => (
           <div
             key={t.id}
-            className={`px-4 py-3 rounded-lg shadow-xl text-sm font-medium border flex items-center gap-2 animate-slide-in pointer-events-auto max-w-sm transition-all duration-300 ${
-              t.type === 'error'
-                ? 'bg-[#1e1416]/95 text-[#f87171] border-[#ef4444]/20'
-                : t.type === 'success'
-                ? 'bg-[#101b15]/95 text-[#34d399] border-[#10b981]/20'
-                : 'bg-[#151922]/95 text-[#60a5fa] border-[#3b82f6]/20'
-            }`}
+            className={`aura-toast aura-toast-${t.type}`}
           >
-            <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
-              backgroundColor: t.type === 'error' ? '#ef4444' : t.type === 'success' ? '#10b981' : '#3b82f6'
-            }} />
+            <div className="aura-toast-dot" />
             <span>{t.message}</span>
           </div>
         ))}
