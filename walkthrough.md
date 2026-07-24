@@ -29,6 +29,12 @@ We have successfully generalised the Dubstrata-specific B2B research workspace i
 - **Gemini Search Grounding Pipeline**: Connected search pipeline triggers to Gemini with the **Google Search Grounding Tool** enabled. When research ingestion runs, it performs active Google Maps/Search local places queries, retrieves structured JSON records of live local businesses (names, phone numbers, addresses, websites, descriptions), and merges them into the lead board with the `"Local Search (Google Maps)"` segment tag.
 - **UI Configuration Panel**: Integrated a dedicated Google Maps query text input inside the configuration dashboard under settings Tab 2.
 
+### 6. Dynamic Business-Aligned Synthesis & Email Harvesting
+- **Dynamic Context-Aware Synthesis**: Modified `run_synthesis_logic` to pass the active profile's `business_context` and `targets_icp` to Gemini. The model now identifies B2B pain points, value propositions, and jargon relative to **our** offering instead of Dubstrata defaults.
+- **Removed Hardcoded Dubstrata Templates**: Deleted `SEGMENT_TEMPLATES` and static `get_segment_config` helpers. Fallbacks in `generate_outreach` are now dynamically constructed from active profile configurations.
+- **Grounded Email Scraping**: Integrated `resolve_lead_email_via_grounding` which triggers Google Search Grounding to scrape a lead's website or public listings for contact email addresses when they are missing.
+- **Lead Filtering (Auto-Deletion)**: Ingested targets without any resolvable email address are immediately filtered out and discarded, ensuring only contactable, verified leads reach the dashboard.
+
 ## Verification & Build
 - Checked syntax and verified that uvicorn boots successfully on port 8000.
 - Ran `npm run build` to confirm Vite builds the React environment perfectly with zero errors.
