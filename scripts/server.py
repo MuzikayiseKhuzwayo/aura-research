@@ -56,7 +56,7 @@ def load_profiles_data() -> dict:
             "search_queries_maps": [
                 "software agencies in San Francisco"
             ],
-            "search_interval_seconds": 7200,
+            "search_interval_seconds": 900,
             "email_config": {
                 "provider": "privateemail",
                 "email_address": "muzikhuzwayo@techfusion-ventures.xyz",
@@ -147,7 +147,7 @@ async def run_scheduler():
             profiles_data = load_profiles_data()
             active_id = profiles_data.get("active_profile_id", "default")
             profile = next((p for p in profiles_data["profiles"] if p["id"] == active_id), None)
-            interval = profile.get("search_interval_seconds", 7200) if profile else 7200
+            interval = profile.get("search_interval_seconds", 900) if profile else 900
             
             await asyncio.sleep(interval)
             print("Scheduler: triggering research ingestion pipeline in background thread...")
@@ -384,7 +384,7 @@ def create_profile(req: CreateProfileModel):
         "search_queries_ai": ["ai-agents stars:>5"],
         "search_queries_quant": ["backtesting stars:>5"],
         "search_queries_maps": ["software agencies in San Francisco"],
-        "search_interval_seconds": 7200,
+        "search_interval_seconds": 900,
         "email_config": {
             "provider": "gmail",
             "email_address": "",
@@ -1006,13 +1006,25 @@ def generate_outreach(req: GenerateRequest):
         recent_signal = lead.get("technical_signals", {}).get("recent_filing_or_post", "recent business operations")
 
     system_instruction = (
-        f"You are writing a cold outreach message on behalf of {profile.get('name') if profile else 'our team'}, acting as {segment_config['persona']}.\n"
-        f"Business Context: {profile.get('business_context') if profile else 'B2B outreach provider'}\n\n"
-        f"Recipient is in segment: '{lead.get('segment')}' and faces these pain points: {segment_config['pain_points']}.\n"
-        f"Value Prop: {segment_config['value_proposition']}.\n\n"
-        f"{profile.get('system_prompt_outreach') if profile else 'strictly 3 to 4 sentences.'}\n"
-        f"Format for channel: {req.channel.upper()}.\n"
-        "Respond strictly in valid JSON matching the specified response schema."
+        f"### IDENTITY & CONTEXT\n"
+        f"You are writing a cold outreach message on behalf of {profile.get('name', 'our team')}, acting as {segment_config['persona']}.\n"
+        f"Business Context: {profile.get('business_context', 'B2B outreach provider')}\n"
+        f"Recipient Segment: '{lead.get('segment')}'\n"
+        f"Target Pain Points: {segment_config['pain_points']}\n"
+        f"Value Proposition: {segment_config['value_proposition']}\n\n"
+
+        f"### MESSAGING & TONAL RULES\n"
+        f"- **Voice:** Direct, peer-to-peer engineer/technical voice. Avoid vendor sales pitches, high-level corporate jargon, or marketing oxymorons (e.g., use 'causal signals' instead of 'de-risked alpha').\n"
+        f"- **Problem Framing:** Frame challenges around universal technical realities; do not assume or diagnose internal failure modes in the recipient's system.\n"
+        f"- **Subject Lines:** Short, punchy, and action-oriented. Avoid formal or document-style titles.\n"
+        f"- **Structural Flow:** Follow a logical narrative arc: Universal Technical Need -> Engine/Solution -> Scannable Bulleted Data Streams -> Sample Offer & CTA.\n"
+        f"- **Call to Action:** Close with a concrete, specific, low-friction question inviting action (e.g., 'Open to running a test batch through your agents?'). Avoid weak, generic closures like 'Interested?'.\n\n"
+
+        f"### FORMATTING & OUTPUT CONSTRAINTS\n"
+        f"- **Scannability:** Never output dense walls of text. Use short, crisp bullet points for technical capabilities, data offerings, or feature specs.\n"
+        f"- **Length Rule:** {profile.get('system_prompt_outreach', 'Keep messaging strictly between 3 to 4 concise sentences/blocks.')}\n"
+        f"- **Channel Formatting:** Format appropriately for channel: {req.channel.upper()}.\n"
+        f"- **Output:** Respond strictly in valid JSON matching the specified response schema.\n"
     )
 
     prompt = (

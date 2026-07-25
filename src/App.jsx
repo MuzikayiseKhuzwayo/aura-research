@@ -62,7 +62,7 @@ export default function App() {
   const [queriesAi, setQueriesAi] = useState('');
   const [queriesQuant, setQueriesQuant] = useState('');
   const [queriesMaps, setQueriesMaps] = useState('');
-  const [intervalSecs, setIntervalSecs] = useState(7200);
+  const [intervalSecs, setIntervalSecs] = useState(900);
   const [emailProvider, setEmailProvider] = useState('gmail');
   const [emailAddress, setEmailAddress] = useState('');
   const [emailPassword, setEmailPassword] = useState('');
@@ -108,7 +108,7 @@ export default function App() {
     setQueriesAi((profile.search_queries_ai || []).join(', '));
     setQueriesQuant((profile.search_queries_quant || []).join(', '));
     setQueriesMaps((profile.search_queries_maps || []).join(', '));
-    setIntervalSecs(profile.search_interval_seconds || 7200);
+    setIntervalSecs(profile.search_interval_seconds || 900);
     
     const email = profile.email_config || {};
     setEmailProvider(email.provider || 'gmail');
@@ -391,9 +391,9 @@ export default function App() {
 
   const handleAutoDraft = async () => {
     if (autoDrafting) return;
-    const eligibleLeads = targets.filter(t => t.status === 'Ready' || t.status === 'Drafted');
+    const eligibleLeads = targets.filter(t => t.status === 'Ready' || t.status === 'DM Drafted');
     if (eligibleLeads.length === 0) {
-      showToast('No targets in "Ready" or "Drafted" status to auto-draft.', 'info');
+      showToast('No targets in "Ready" or "DM Drafted" status to auto-draft.', 'info');
       return;
     }
     setAutoDrafting(true);
@@ -401,28 +401,33 @@ export default function App() {
     let successCount = 0;
     for (let i = 0; i < eligibleLeads.length; i++) {
       const lead = eligibleLeads[i];
-      showToast(`[${i+1}/${eligibleLeads.length}] Auto-drafting email for ${lead.name}...`, 'info');
+      showToast(`[${i+1}/${eligibleLeads.length}] Processing email for ${lead.name}...`, 'info');
       try {
-        const genRes = await fetch(`${API_BASE}/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: lead.id, channel: 'email' })
-        });
-        if (!genRes.ok) throw new Error('Generation failed');
-        const genData = await genRes.json();
+        let emailDraft = lead.drafts?.email || '';
         
-        handleUpdateDraft(lead.id, 'email', genData.draft);
+        // Only generate a new draft if one doesn't exist already
+        if (!emailDraft.trim()) {
+          const genRes = await fetch(`${API_BASE}/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: lead.id, channel: 'email' })
+          });
+          if (!genRes.ok) throw new Error('Generation failed');
+          const genData = await genRes.json();
+          emailDraft = genData.generated_text || genData.draft || '';
+          handleUpdateDraft(lead.id, 'email', emailDraft);
+        }
         
         const pushRes = await fetch(`${API_BASE}/leads/send-privateemail-draft`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: lead.id })
+          body: JSON.stringify({ id: lead.id, draft_text: emailDraft })
         });
         if (!pushRes.ok) throw new Error('Failed to push draft to server');
         
         setTargets(prev => prev.map(t => {
           if (t.id === lead.id) {
-            return { ...t, status: 'Sent', drafts: { ...t.drafts, email: genData.draft } };
+            return { ...t, status: 'Sent', drafts: { ...t.drafts, email: emailDraft } };
           }
           return t;
         }));
