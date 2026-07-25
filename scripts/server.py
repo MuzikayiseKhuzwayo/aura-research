@@ -15,6 +15,34 @@ from google.genai import types
 # Active profile tracking (in-memory, defaults to first profile)
 ACTIVE_PROFILE_ID = "default"
 
+KNOWN_CITIES = [
+    # Europe
+    "London", "Paris", "Berlin", "Madrid", "Rome", "Warsaw", "Vienna", "Prague", "Brussels", "Amsterdam", 
+    "Lisbon", "Athens", "Dublin", "Copenhagen", "Stockholm", "Oslo", "Helsinki", "Budapest", "Bucharest", 
+    "Munich", "Frankfurt", "Hamburg", "Milan", "Barcelona", "Zurich", "Geneva", "Istanbul", "Moscow", 
+    "St Petersburg", "Kyiv", "Kiev",
+    # North America
+    "New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", 
+    "Dallas", "San Jose", "Austin", "Jacksonville", "San Francisco", "Columbus", "Indianapolis", "Seattle", 
+    "Denver", "Boston", "El Paso", "Nashville", "Detroit", "Las Vegas", "Portland", "Miami", "Atlanta", 
+    "Toronto", "Vancouver", "Montreal", "Calgary", "Ottawa", "Mexico City", "Guadalajara", "Monterrey",
+    # Asia & Middle East
+    "Tokyo", "Yokohama", "Osaka", "Nagoya", "Kyoto", "Seoul", "Busan", "Incheon", "Beijing", "Shanghai", 
+    "Shenzhen", "Guangzhou", "Chengdu", "Wuhan", "Chongqing", "Hong Kong", "Taipei", "Singapore", "Bangkok", 
+    "Jakarta", "Kuala Lumpur", "Manila", "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Kolkata", "Chennai", 
+    "Ahmedabad", "Karachi", "Lahore", "Dhaka", "Tehran", "Baghdad", "Riyadh", "Jeddah", "Dubai", "Abu Dhabi", 
+    "Tel Aviv", "Jerusalem", "Ankara",
+    # South & Central America
+    "Sao Paulo", "Rio de Janeiro", "Buenos Aires", "Bogota", "Lima", "Santiago", 
+    "Caracas", "Quito", "Guayaquil", "Montevideo", "Asuncion", "La Paz", "Brasilia", "Belo Horizonte",
+    # Africa
+    "Cairo", "Giza", "Lagos", "Johannesburg", "Cape Town", "Durban", "Nairobi", "Addis Ababa", "Casablanca", 
+    "Algiers", "Tunis", "Accra", "Luanda", "Khartoum", "Dakar", "Dar es Salaam",
+    # Oceania
+    "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Auckland", "Wellington", "Christchurch"
+]
+
+
 PROFILES_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "profiles.json")
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "profiles")
 
@@ -614,6 +642,28 @@ def trigger_research():
 
         # Run Google Maps Discovery via Gemini + Google Search Grounding Tool
         maps_queries = profile.get("search_queries_maps", []) if profile else []
+        
+        # Dynamic global city search expansion
+        import random
+        selected_cities = random.sample(KNOWN_CITIES, 3)
+        print(f"Dynamically selecting cities for global B2B outreach expansion: {selected_cities}")
+        
+        is_financial = False
+        icp_lower = (profile.get("targets_icp", "") + " " + profile.get("name", "")).lower()
+        if any(w in icp_lower for w in ["quant", "hedge", "trading", "finance", "money manager", "asset manager"]):
+            is_financial = True
+            
+        expanded_queries = list(maps_queries)
+        for city in selected_cities:
+            if is_financial:
+                expanded_queries.append(f"quantitative hedge funds in {city}")
+                expanded_queries.append(f"systematic trading desks in {city}")
+                expanded_queries.append(f"asset managers in {city}")
+            else:
+                icp_keyword = profile.get("targets_icp", "software development firms").split(",")[0].split("&")[0].strip()
+                expanded_queries.append(f"{icp_keyword} in {city}")
+                
+        maps_queries = expanded_queries
         maps_leads = []
         import urllib.parse
         if api_key and maps_queries:
