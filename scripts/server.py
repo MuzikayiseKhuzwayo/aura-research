@@ -921,6 +921,91 @@ def send_email_draft(req: PushDraftRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"IMAP Error: {str(e)}")
 
+@app.post("/api/leads/send-email-smtp")
+def send_email_smtp(req: PushDraftRequest):
+    profiles_data = load_profiles_data()
+    active_id = profiles_data.get("active_profile_id", "default")
+    profile = next((p for p in profiles_data["profiles"] if p["id"] == active_id), None)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Active profile not found")
+        
+    email_cfg = profile.get("email_config", {})
+    email_address = email_cfg.get("email_address", "")
+    password = email_cfg.get("password", "")
+    provider = email_cfg.get("provider", "custom")
+    
+    smtp_server = email_cfg.get("smtp_server", "")
+    smtp_port = int(email_cfg.get("smtp_port", 465))
+    
+    if provider == "gmail":
+        smtp_server = smtp_server or "smtp.gmail.com"
+    elif provider == "outlook":
+        smtp_server = smtp_server or "smtp.office365.com"
+    elif provider == "yahoo":
+        smtp_server = smtp_server or "smtp.mail.yahoo.com"
+    elif provider == "privateemail":
+        smtp_server = smtp_server or "mail.privateemail.com"
+
+    if not email_address or not password or not smtp_server:
+        raise HTTPException(
+            status_code=400, 
+            detail="Email address, password, or SMTP server is not configured in settings."
+        )
+
+    leads = load_leads()
+    lead = next((l for l in leads if l["id"] == req.id), None)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+        
+    to_email = lead.get("channels", {}).get("email", "")
+    if not to_email:
+        raise HTTPException(status_code=400, detail="Target lead has no email address configured.")
+
+    subject = "Partner Research Discovery"
+    body = req.draft_text
+    
+    lines = req.draft_text.split('\n')
+    subject_line = next((l for l in lines if l.startswith('Subject: ')), None)
+    if subject_line:
+        subject = subject_line.replace('Subject: ', '').strip()
+        body_lines = [l for l in lines if not l.startswith('Subject: ')]
+        body = '\n'.join(body_lines).strip()
+
+    import smtplib
+    from email.message import EmailMessage
+
+    try:
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = email_address
+        msg['To'] = to_email
+        msg.set_content(body)
+
+        print(f"Connecting to SMTP server {smtp_server}:{smtp_port} for {email_address}...")
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            
+        server.login(email_address, password)
+        server.send_message(msg)
+        server.quit()
+        
+        lead["history"].append({
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "type": "sent",
+            "channel": "email",
+            "content": f"Successfully sent email via SMTP to {to_email}: {subject}"
+        })
+        lead["status"] = "Sent"
+        save_leads(leads)
+        return {"status": "success"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"SMTP Error: {str(e)}")
+
 @app.post("/api/leads/log-history")
 def log_history(req: LogHistoryRequest):
     leads = load_leads()

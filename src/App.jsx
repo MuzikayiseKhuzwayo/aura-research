@@ -442,6 +442,86 @@ export default function App() {
     fetchLeads(false);
   };
 
+  const [autoSending, setAutoSending] = useState(false);
+
+  const handleAutoSend = async () => {
+    if (autoSending) return;
+    const eligibleLeads = targets.filter(t => t.status === 'Ready' || t.status === 'DM Drafted');
+    if (eligibleLeads.length === 0) {
+      showToast('No targets in "Ready" or "DM Drafted" status to auto-send.', 'info');
+      return;
+    }
+    setAutoSending(true);
+    showToast(`Starting sequential auto-send sequence for ${eligibleLeads.length} targets...`, 'info');
+    let sentCount = 0;
+    let draftCount = 0;
+    for (let i = 0; i < eligibleLeads.length; i++) {
+      const lead = eligibleLeads[i];
+      showToast(`[${i+1}/${eligibleLeads.length}] Auto-sending email to ${lead.name}...`, 'info');
+      try {
+        let emailDraft = lead.drafts?.email || '';
+        
+        if (!emailDraft.trim()) {
+          const genRes = await fetch(`${API_BASE}/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: lead.id, channel: 'email' })
+          });
+          if (!genRes.ok) throw new Error('Generation failed');
+          const genData = await genRes.json();
+          emailDraft = genData.generated_text || genData.draft || '';
+          handleUpdateDraft(lead.id, 'email', emailDraft);
+        }
+        
+        try {
+          const sendRes = await fetch(`${API_BASE}/leads/send-email-smtp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: lead.id, draft_text: emailDraft })
+          });
+          if (!sendRes.ok) {
+            const errData = await sendRes.json();
+            throw new Error(errData.detail || 'SMTP transfer failed');
+          }
+          
+          setTargets(prev => prev.map(t => {
+            if (t.id === lead.id) {
+              return { ...t, status: 'Sent', drafts: { ...t.drafts, email: emailDraft } };
+            }
+            return t;
+          }));
+          sentCount++;
+          showToast(`Successfully sent email to ${lead.name}!`, 'success');
+        } catch (smtpErr) {
+          console.error("SMTP direct send failed. Falling back to IMAP Draft:", smtpErr);
+          showToast(`SMTP failed for ${lead.name}. Falling back to Draft folder...`, 'error');
+          
+          const pushRes = await fetch(`${API_BASE}/leads/send-privateemail-draft`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: lead.id, draft_text: emailDraft })
+          });
+          if (!pushRes.ok) throw new Error('SMTP failed and IMAP draft backup failed.');
+          
+          setTargets(prev => prev.map(t => {
+            if (t.id === lead.id) {
+              return { ...t, status: 'DM Drafted', drafts: { ...t.drafts, email: emailDraft } };
+            }
+            return t;
+          }));
+          draftCount++;
+          showToast(`Saved draft for ${lead.name} to server folder.`, 'success');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast(`Failed to process ${lead.name}: ${err.message}`, 'error');
+      }
+    }
+    setAutoSending(false);
+    showToast(`Auto-send run complete! Sent: ${sentCount}, Saved as Drafts: ${draftCount}`, 'success');
+    fetchLeads(false);
+  };
+
   const activeProfile = profiles.find(p => p.id === activeProfileId) || {};
 
   const sortedProfiles = [...profiles].sort((a, b) => {
@@ -627,6 +707,19 @@ export default function App() {
                 }}
               >
                 {autoDrafting ? 'Drafting Emails...' : 'Auto-Draft Emails'}
+              </button>
+              <button 
+                id="btn-auto-send"
+                className="btn-primary" 
+                onClick={handleAutoSend}
+                disabled={autoSending}
+                style={{ 
+                  fontSize: '0.85rem', 
+                  boxShadow: autoSending ? 'none' : '0 4px 14px rgba(99, 102, 241, 0.4)',
+                  background: autoSending ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' 
+                }}
+              >
+                {autoSending ? 'Sending Emails...' : 'Auto-Send Emails'}
               </button>
               <button id="btn-refresh-leads" className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => fetchLeads(true)}>
                 Refresh Leads
