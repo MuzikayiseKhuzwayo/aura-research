@@ -16,7 +16,7 @@ We have successfully generalised the Dubstrata-specific B2B research workspace i
 
 ### 3. Unified Settings Workspace (Bottom Settings Gear)
 - Consolidated all setups into a dedicated Settings Overlay accessible from the bottom gear icon in the sidebar:
-  - **ICP & Business Context Setup**: Configure business details, targets, and Custom give-first assets. Included a **✦ Enhance with Gemini** AI optimize button.
+  - **ICP & Business Context Setup**: Configure B2B parameters, targets, and custom assets. Included a **✦ Enhance with Gemini** AI optimize button.
   - **Prompts & Search Timing Setup**: Customise system prompts for research synthesis, outreach copy generation, and timing intervals.
   - **Email Integrations Setup**: Connected email configurations with native SMTP/IMAP draft syncing for **Gmail, Outlook/Office365, Yahoo, PrivateEmail, and Custom IMAP**.
 
@@ -34,6 +34,15 @@ We have successfully generalised the Dubstrata-specific B2B research workspace i
 - **Removed Hardcoded Dubstrata Templates**: Deleted `SEGMENT_TEMPLATES` and static `get_segment_config` helpers. Fallbacks in `generate_outreach` are now dynamically constructed from active profile configurations.
 - **Grounded Email Scraping**: Integrated `resolve_lead_email_via_grounding` which triggers Google Search Grounding to scrape a lead's website or public listings for contact email addresses when they are missing.
 - **Lead Filtering (Auto-Deletion)**: Ingested targets without any resolvable email address are immediately filtered out and discarded, ensuring only contactable, verified leads reach the dashboard.
+
+### 7. Email Health Deliverability & Safety Circuit Breaker
+- **DNS Verification (SPF/DMARC)**: Injected automated `nslookup` checks on the backend `/api/email/health` endpoint to verify SPF and DMARC TXT record compliance.
+- **Spamhaus DBL Blacklist Query**: Added a real-time blacklist lookup resolving the domain against `dbl.spamhaus.org`.
+- **IMAP Bounce Tracking**: Scans recent messages (past 7 days) from mailer-daemons and undelivered status mailboxes to calculate a dynamic bounce-rate penalty.
+- **Safety Circuit Breaker & Send Blocker**:
+  - Displays a deliverability health score badge (e.g. `Deliverability: 90% Excellent`) in the main header.
+  - If the health score drops below **65%**, the dashboard displays a warning layout banner and **disables the Auto-Send button** to safeguard your sending domain's reputation.
+  - The backend SMTP `/send-email-smtp` endpoint actively rejects submissions if deliverability health checks fail.
 
 ## Verification & Build
 - Checked syntax and verified that uvicorn boots successfully on port 8000.
