@@ -75,6 +75,17 @@ export default function App() {
   const [enhancingIcp, setEnhancingIcp] = useState(false);
   const [refiningProfile, setRefiningProfile] = useState(false);
 
+  const [emailHealth, setEmailHealth] = useState({
+    health_score: 100,
+    status: 'Healthy',
+    spf: true,
+    dmarc: true,
+    blacklisted: false,
+    recent_bounces: 0,
+    locked: false
+  });
+  const [fetchingHealth, setFetchingHealth] = useState(false);
+
   // Sync settings form state when activeProfileId or profiles updates
   useEffect(() => {
     const activeProf = profiles.find(p => p.id === activeProfileId);
@@ -95,6 +106,21 @@ export default function App() {
       updateVisited(activeId);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchEmailHealth = async () => {
+    setFetchingHealth(true);
+    try {
+      const res = await fetch(`${API_BASE}/email/health`);
+      if (res.ok) {
+        const data = await res.json();
+        setEmailHealth(data);
+      }
+    } catch (err) {
+      console.error("Error fetching email health:", err);
+    } finally {
+      setFetchingHealth(false);
     }
   };
 
@@ -170,6 +196,7 @@ export default function App() {
       }
       setShowSettings(false); // Auto close settings so they go directly to Workspace
       setError(null);
+      await fetchEmailHealth();
     } catch (err) {
       console.error(err);
       showToast('Error switching profile.', 'error');
@@ -239,6 +266,7 @@ export default function App() {
       
       // Refresh local profiles structure
       await fetchProfiles();
+      await fetchEmailHealth();
       showToast('Profile configuration saved successfully!', 'success');
     } catch (err) {
       console.error(err);
@@ -317,6 +345,7 @@ export default function App() {
   useEffect(() => {
     fetchProfiles();
     fetchLeads();
+    fetchEmailHealth();
   }, []);
 
   const selectedLead = targets.find((t) => t.id === selectedLeadId);
@@ -671,8 +700,25 @@ export default function App() {
               <Target color="white" size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'white' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {showSettings ? `Configuring Profile: ${activeProfile.name || ''}` : activeProfile.name || ''}
+                {!showSettings && emailAddress && (
+                  <span 
+                    className={`badge ${emailHealth.locked ? 'badge-ignored' : 'badge-replied'}`}
+                    style={{ 
+                      fontSize: '0.65rem', 
+                      padding: '2px 8px', 
+                      cursor: 'pointer',
+                      boxShadow: emailHealth.locked ? '0 0 10px rgba(239, 68, 68, 0.2)' : '0 0 10px rgba(16, 185, 129, 0.2)'
+                    }}
+                    title={`SPF: ${emailHealth.spf ? 'OK' : 'FAIL'} | DMARC: ${emailHealth.dmarc ? 'OK' : 'FAIL'} | Blacklisted: ${emailHealth.blacklisted ? 'YES' : 'NO'} | Bounces: ${emailHealth.recent_bounces}`}
+                    onClick={() => {
+                      showToast(`Email Deliverability: ${emailHealth.health_score}% (${emailHealth.status}). SPF: ${emailHealth.spf ? 'Valid' : 'Invalid'}, DMARC: ${emailHealth.dmarc ? 'Valid' : 'Invalid'}, Blacklist: ${emailHealth.blacklisted ? 'Listed' : 'Clean'}, Bounces: ${emailHealth.recent_bounces}`, 'info');
+                    }}
+                  >
+                    Deliverability: {emailHealth.health_score}% {emailHealth.status}
+                  </span>
+                )}
               </h2>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 {showSettings ? 'Tailor B2B context, crawler prompts, and integration details' : 'Direct AI discovery pipeline and customized outreach composers'}
@@ -712,12 +758,14 @@ export default function App() {
                 id="btn-auto-send"
                 className="btn-primary" 
                 onClick={handleAutoSend}
-                disabled={autoSending}
+                disabled={autoSending || emailHealth.locked}
                 style={{ 
                   fontSize: '0.85rem', 
-                  boxShadow: autoSending ? 'none' : '0 4px 14px rgba(99, 102, 241, 0.4)',
-                  background: autoSending ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' 
+                  boxShadow: (autoSending || emailHealth.locked) ? 'none' : '0 4px 14px rgba(99, 102, 241, 0.4)',
+                  background: (autoSending || emailHealth.locked) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  cursor: emailHealth.locked ? 'not-allowed' : 'pointer'
                 }}
+                title={emailHealth.locked ? "Automated sending disabled due to critical deliverability score" : "Auto-send drafted outreach"}
               >
                 {autoSending ? 'Sending Emails...' : 'Auto-Send Emails'}
               </button>
@@ -727,6 +775,15 @@ export default function App() {
             </div>
           )}
         </header>
+
+        {emailHealth.locked && emailAddress && (
+          <div className="glass" style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '10px', borderRadius: '12px' }}>
+            <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+            <div>
+              <strong>Email Deliverability Lockout Active:</strong> Health score is critical ({emailHealth.health_score}%). Automated SMTP sending is locked to prevent domain damage. SPF: {emailHealth.spf ? 'Valid' : 'Missing/Invalid'}, DMARC: {emailHealth.dmarc ? 'Valid' : 'Missing/Invalid'}, Blacklisted: {emailHealth.blacklisted ? 'Yes' : 'No'}. Check configuration in Setup Settings.
+            </div>
+          </div>
+        )}
 
         {error && (
           <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--status-ignored)', padding: '12px 16px', borderRadius: '8px', fontSize: '0.9rem' }}>

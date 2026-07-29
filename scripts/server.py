@@ -929,6 +929,18 @@ def send_email_smtp(req: PushDraftRequest):
     if not profile:
         raise HTTPException(status_code=404, detail="Active profile not found")
         
+    try:
+        health = get_email_health()
+        if health.get("locked"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Email sending blocked: Deliverability health is critical ({health.get('health_score')}%). Please verify your SPF/DMARC records or blacklist status."
+            )
+    except HTTPException:
+        raise
+    except Exception as he:
+        print(f"Skipping health check blocker: {he}")
+        
     email_cfg = profile.get("email_config", {})
     email_address = email_cfg.get("email_address", "")
     password = email_cfg.get("password", "")
@@ -1005,6 +1017,108 @@ def send_email_smtp(req: PushDraftRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"SMTP Error: {str(e)}")
+
+def check_dns_records(domain: str) -> dict:
+    spf_ok = False
+    dmarc_ok = False
+    try:
+        res = subprocess.run(["nslookup", "-type=txt", domain], capture_output=True, text=True, timeout=5)
+        if "v=spf1" in res.stdout:
+            spf_ok = True
+    except Exception as e:
+        print(f"SPF query error: {e}")
+    try:
+        res = subprocess.run(["nslookup", "-type=txt", f"_dmarc.{domain}"], capture_output=True, text=True, timeout=5)
+        if "v=DMARC1" in res.stdout:
+            dmarc_ok = True
+    except Exception as e:
+        print(f"DMARC query error: {e}")
+    return {"spf": spf_ok, "dmarc": dmarc_ok}
+
+def check_domain_blacklists(domain: str) -> bool:
+    try:
+        res = subprocess.run(["nslookup", "-type=a", f"{domain}.dbl.spamhaus.org"], capture_output=True, text=True, timeout=5)
+        if "Address:" in res.stdout and "127.0.1." in res.stdout:
+            return True
+    except Exception as e:
+        print(f"Blacklist check error: {e}")
+    return False
+
+def check_imap_bounces(imap_server: str, imap_port: int, email_address: str, password: str) -> int:
+    import imaplib
+    from datetime import datetime, timedelta
+    try:
+        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+        mail.login(email_address, password)
+        mail.select("INBOX")
+        date_cutoff = (datetime.now() - timedelta(days=7)).strftime("%d-%b-%Y")
+        bounce_count = 0
+        status, messages = mail.search(None, f'(SINCE {date_cutoff} (FROM "mailer-daemon" OR FROM "postmaster" OR SUBJECT "delivery status"))')
+        if status == "OK" and messages[0]:
+            bounce_count = len(messages[0].split())
+        mail.logout()
+        return bounce_count
+    except Exception as e:
+        print(f"IMAP bounce check error: {e}")
+        return 0
+
+@app.get("/api/email/health")
+def get_email_health():
+    profiles_data = load_profiles_data()
+    active_id = profiles_data.get("active_profile_id", "default")
+    profile = next((p for p in profiles_data["profiles"] if p["id"] == active_id), None)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Active profile not found")
+    email_cfg = profile.get("email_config", {})
+    email_address = email_cfg.get("email_address", "")
+    password = email_cfg.get("password", "")
+    provider = email_cfg.get("provider", "custom")
+    imap_server = email_cfg.get("imap_server", "")
+    imap_port = int(email_cfg.get("imap_port", 993))
+    if provider == "gmail":
+        imap_server = imap_server or "imap.gmail.com"
+    elif provider == "outlook":
+        imap_server = imap_server or "imap-mail.outlook.com"
+    elif provider == "yahoo":
+        imap_server = imap_server or "imap.mail.yahoo.com"
+    elif provider == "privateemail":
+        imap_server = imap_server or "mail.privateemail.com"
+    if not email_address:
+        return {
+            "health_score": 100,
+            "status": "Healthy (No email connected)",
+            "spf": True,
+            "dmarc": True,
+            "blacklisted": False,
+            "recent_bounces": 0,
+            "locked": False
+        }
+    domain = email_address.split("@")[-1]
+    dns_res = check_dns_records(domain)
+    blacklisted = check_domain_blacklists(domain)
+    bounces = 0
+    if password and imap_server:
+        bounces = check_imap_bounces(imap_server, imap_port, email_address, password)
+    score = 100
+    if not dns_res["spf"]:
+        score -= 20
+    if not dns_res["dmarc"]:
+        score -= 20
+    if blacklisted:
+        score -= 50
+    score -= min(bounces * 10, 30)
+    score = max(score, 0)
+    locked = score < 65
+    status = "Excellent" if score >= 90 else "Good" if score >= 75 else "Warning" if score >= 65 else "Critical"
+    return {
+        "health_score": score,
+        "status": status,
+        "spf": dns_res["spf"],
+        "dmarc": dns_res["dmarc"],
+        "blacklisted": blacklisted,
+        "recent_bounces": bounces,
+        "locked": locked
+    }
 
 @app.post("/api/leads/log-history")
 def log_history(req: LogHistoryRequest):
