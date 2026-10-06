@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Partner Research — Autonomous B2B Discovery & Outreach Cockpit</title>
+  <meta name="description" content="Autonomous B2B partner discovery, developer intelligence, and Give-First outreach engine. Built with React 19, FastAPI, and Google Gemini.">
+  <link rel="icon" type="image/svg+xml" href="../public/favicon.svg">
+  <style>
+    :root {
+      --bg: #07090e;
+      --surface: rgba(18, 24, 38, 0.7);
+      --surface-hover: rgba(30, 41, 59, 0.8);
+      --border: rgba(99, 102, 241, 0.2);
+      --border-strong: rgba(99, 102, 241, 0.4);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.3);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --cyan: #06b6d4;
+      --amber: #f59e0b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 20% 15%, rgba(99, 102, 241, 0.15) 0%, transparent 45%),
+        radial-gradient(circle at 80% 65%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
+    }
+
+    /* Container */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+    /* Navigation */
+    nav {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(7, 9, 14, 0.75);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary), var(--cyan));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px var(--primary-glow);
+    }
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--text);
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--primary);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 90px 0 60px 0;
+      text-align: center;
+    }
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #818cf8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 3.8rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      background: linear-gradient(180deg, #ffffff 40%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p.subtitle {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      max-width: 760px;
+      margin: 0 auto 36px auto;
+    }
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+    .keyboard-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .kbd {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      font-weight: bold;
+    }
+
+    /* Interactive Cockpit Simulator */
+    .cockpit-preview {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px var(--primary-glow);
+      overflow: hidden;
+      margin-bottom: 90px;
+      backdrop-filter: blur(20px);
+    }
+    .cockpit-topbar {
+      height: 48px;
+      background: rgba(10, 14, 24, 0.8);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+    .window-dots {
+      display: flex;
+      gap: 8px;
+    }
+    .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-green { background: #10b981; }
+
+    .cockpit-body {
+      display: grid;
+      grid-template-columns: 280px 1fr 340px;
+      min-height: 480px;
+    }
+    @media(max-width: 960px) {
+      .cockpit-body { grid-template-columns: 1fr; }
+    }
+    .cockpit-panel {
+      padding: 20px;
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .cockpit-panel:last-child { border-right: none; }
+    
+    .panel-header {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Target Lead Card */
+    .lead-row {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .lead-row:hover, .lead-row.active {
+      background: rgba(99, 102, 241, 0.12);
+      border-color: var(--primary);
+    }
+    .lead-name { font-weight: 600; font-size: 0.92rem; color: #ffffff; }
+    .lead-meta { font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 4px; }
+    .lead-badge {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+    }
+
+    /* Center Signal Inspector */
+    .signal-card {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .signal-label { font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .signal-val { font-size: 0.88rem; color: #e2e8f0; }
+
+    /* Composer Preview */
+    .composer-preview {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    /* 4-Quadrant Diataxis Grid */
+    .section-heading {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .section-heading h2 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+    .section-heading p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+
+    .diataxis-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin-bottom: 90px;
+    }
+    .diataxis-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      transition: all 0.2s;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    .diataxis-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+    }
+    .card-tutorial::before { background: var(--primary); }
+    .card-howto::before { background: var(--cyan); }
+    .card-reference::before { background: var(--emerald); }
+    .card-explanation::before { background: var(--amber); }
+
+    .diataxis-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    }
+    .card-quadrant {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+    .color-tutorial { color: #818cf8; }
+    .color-howto { color: #38bdf8; }
+    .color-reference { color: #34d399; }
+    .color-explanation { color: #fbbf24; }
+
+    .card-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 8px; color: #ffffff; }
+    .card-desc { font-size: 0.85rem; color: var(--text-muted); flex: 1; }
+    .card-link-text {
+      margin-top: 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Command Palette Modal Simulation */
+    .palette-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(12px);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 15vh;
+      z-index: 1000;
+    }
+    .palette-box {
+      width: 100%;
+      max-width: 580px;
+      background: rgba(18, 24, 38, 0.95);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px var(--primary-glow);
+      overflow: hidden;
+    }
+    .palette-input-wrap {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .palette-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 1.05rem;
+      outline: none;
+      font-family: var(--font-sans);
+    }
+    .palette-list {
+      list-style: none;
+      padding: 8px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .palette-item {
+      padding: 10px 14px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.15s;
+    }
+    .palette-item:hover, .palette-item.active {
+      background: rgba(99, 102, 241, 0.2);
+      color: #ffffff;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 40px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    footer a { color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="container" style="display: flex; width: 100%; justify-content: space-between; align-items: center;">
+      <a href="https://github.com/MuzikayiseKhuzwayo/aura-research" class="brand">
+        <div class="brand-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="6"></circle>
+            <circle cx="12" cy="12" r="2"></circle>
+          </svg>
+        </div>
+        <span>Aura Partner Research</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/tutorials/quickstart.md">Quickstart</a></li>
+        <li><a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/reference/api-specification.md">API Specs</a></li>
+        <li><a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/explanation/architecture-and-design-principles.md">Architecture</a></li>
+        <li>
+          <a href="https://github.com/MuzikayiseKhuzwayo/aura-research" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+            </svg>
+            Star on GitHub
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero container">
+    <div class="badge-pill">Autonomous B2B Intelligence Engine • Version 2.0</div>
+    <h1>Give-First Discovery & Outreach Cockpit</h1>
+    <p class="subtitle">
+      Automate developer discovery across GitHub repositories, Google Places, and arXiv preprints.
+      Synthesize clinical Give-First technical authority and sync drafts directly to your mail client.
+    </p>
+
+    <div class="hero-actions">
+      <a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/tutorials/quickstart.md" class="btn btn-primary" style="padding: 12px 24px; font-size: 0.95rem;">
+        Get Started in 10 Min ↗
+      </a>
+      <a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/reference/api-specification.md" class="btn btn-outline" style="padding: 12px 24px; font-size: 0.95rem;">
+        Explore REST APIs
+      </a>
+      <div class="keyboard-hint" onclick="openPalette()">
+        <span>Command Palette:</span>
+        <span class="kbd">⌘K</span> or <span class="kbd">Ctrl+K</span>
+      </div>
+    </div>
+
+    <!-- Interactive Cockpit Simulator -->
+    <div class="cockpit-preview">
+      <div class="cockpit-topbar">
+        <div class="window-dots">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+        </div>
+        <div style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--text-muted); display: flex; align-items: center; gap: 10px;">
+          <span>Active Campaign: Dubstrata Research</span>
+          <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--emerald);"></span>
+          <span style="color: var(--emerald); font-weight: 600;">Deliverability: 100% Healthy</span>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Simulator</div>
+      </div>
+
+      <div class="cockpit-body">
+        <!-- Panel 1: Sourced Targets -->
+        <div class="cockpit-panel" style="background: rgba(0, 0, 0, 0.15);">
+          <div class="panel-header">
+            <span>Sourced Targets (3)</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">GitHub + Places</span>
+          </div>
+
+          <div class="lead-row active" onclick="selectLead(0)">
+            <div class="lead-name">Alex Thorne</div>
+            <div class="lead-meta">
+              <span>Solana Agent Wallet</span>
+              <span class="lead-badge">Ready</span>
+            </div>
+          </div>
+
+          <div class="lead-row" onclick="selectLead(1)">
+            <div class="lead-name">Dr. Elena Rostova</div>
+            <div class="lead-meta">
+              <span>Alpha Orderbook HFT</span>
+              <span class="lead-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">DM Drafted</span>
+            </div>
+          </div>
+
+          <div class="lead-row" onclick="selectLead(2)">
+            <div class="lead-name">Marcus Vance</div>
+            <div class="lead-meta">
+              <span>MCP Multi-Agent Desk</span>
+              <span class="lead-badge" style="background: rgba(6, 182, 212, 0.15); color: #38bdf8;">Sent</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 2: Technical Signals -->
+        <div class="cockpit-panel" id="panel-signals">
+          <div class="panel-header">
+            <span>Technical Intelligence</span>
+            <span style="color: #34d399;">🤖 Gemini Grounded</span>
+          </div>
+
+          <div class="signal-card">
+            <div class="signal-label">Observed Developer Focus</div>
+            <div class="signal-val" id="signal-focus">Active maintainer of Solana micro-billing agents; built high-throughput JSON-RPC settlement pipelines.</div>
+          </div>
+
+          <div class="signal-card">
+            <div class="signal-label">Give-First Asset to Offer</div>
+            <div class="signal-val" id="signal-asset" style="font-family: var(--font-mono); font-size: 0.8rem; color: #a5b4fc;">Model Context Protocol (MCP) server & micro-billing adapter</div>
+          </div>
+
+          <div class="signal-card">
+            <div class="signal-label">Verified Contact Channel</div>
+            <div class="signal-val" id="signal-email" style="font-size: 0.85rem; color: #34d399;">alex@thorne-labs.io</div>
+          </div>
+        </div>
+
+        <!-- Panel 3: Give-First Composer -->
+        <div class="cockpit-panel" style="background: rgba(0, 0, 0, 0.2);">
+          <div class="panel-header">
+            <span>Give-First Copy Studio</span>
+            <span style="color: var(--text-muted);">Email Format</span>
+          </div>
+
+          <div class="composer-preview" id="composer-text">Subject: Solana agent settlement asset
+
+Saw your work on solana-agent-wallet.
+
+We built an open-source MCP micro-billing adapter for streaming RPC transactions.
+
+Happy to send over the schema and test scripts if useful for your pipeline.</div>
+
+          <div style="margin-top: 14px; display: flex; gap: 8px;">
+            <button class="btn btn-primary" style="flex: 1; font-size: 0.78rem; padding: 6px;" onclick="copyDraft()">
+              Copy Draft
+            </button>
+            <a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/how-to/email-draft-sync-and-deliverability.md" class="btn btn-outline" style="font-size: 0.78rem; padding: 6px;">
+              Sync to Drafts
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Diátaxis Quadrants Section -->
+  <section class="container" style="padding-bottom: 80px;">
+    <div class="section-heading">
+      <div class="badge-pill">Canonical Documentation Suite</div>
+      <h2>Engineered for All Personas</h2>
+      <p>Organized strictly under the Diátaxis taxonomy to eliminate drift and empower developers.</p>
+    </div>
+
+    <div class="diataxis-grid">
+      <!-- 1. Tutorials -->
+      <a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/tutorials/quickstart.md" class="diataxis-card card-tutorial">
+        <span class="card-quadrant color-tutorial">Quadrant 1 • Learning-Oriented</span>
+        <h3 class="card-title">10-Minute Quickstart</h3>
+        <p class="card-desc">Zero-to-one guide to clone, install, configure Gemini, and launch your first live partner campaign.</p>
+        <span class="card-link-text">Read Quickstart Tutorial ↗</span>
+      </a>
+
+      <!-- 2. How-To Guides -->
+      <a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/how-to/multi-profile-campaigns.md" class="diataxis-card card-howto">
+        <span class="card-quadrant color-howto">Quadrant 2 • Problem-Oriented</span>
+        <h3 class="card-title">Multi-Profile Campaigns</h3>
+        <p class="card-desc">Step-by-step recipe for isolating campaign databases, fine-tuning ICP contexts, and scheduling background crawls.</p>
+        <span class="card-link-text">Read Campaign Recipe ↗</span>
+      </a>
+
+      <!-- 3. Reference -->
+      <a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/reference/api-specification.md" class="diataxis-card card-reference">
+        <span class="card-quadrant color-reference">Quadrant 3 • Information-Oriented</span>
+        <h3 class="card-title">Machine API Specification</h3>
+        <p class="card-desc">Accurate endpoint specs for lead harvesting, arXiv enrichment, Gemini prompts, and SPF/DMARC deliverability telemetry.</p>
+        <span class="card-link-text">View REST API Contracts ↗</span>
+      </a>
+
+      <!-- 4. Explanation -->
+      <a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/explanation/architecture-and-design-principles.md" class="diataxis-card card-explanation">
+        <span class="card-quadrant color-explanation">Quadrant 4 • Understanding-Oriented</span>
+        <h3 class="card-title">Architecture & Principles</h3>
+        <p class="card-desc">Deep narrative on the 3-layer architecture, Give-First psychology, and deliverability circuit breaker mathematics.</p>
+        <span class="card-link-text">Read Architectural Rationale ↗</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- Interactive Command Palette Modal -->
+  <div class="palette-overlay" id="paletteOverlay" onclick="closePalette(event)">
+    <div class="palette-box">
+      <div class="palette-input-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="palette-input" id="paletteInput" placeholder="Type a command or search documentation..." autofocus />
+        <span class="kbd">ESC</span>
+      </div>
+      <ul class="palette-list" id="paletteList">
+        <li class="palette-item" onclick="window.location.href='https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/tutorials/quickstart.md'">
+          <span>🚀 Open 10-Minute Quickstart</span>
+          <span class="kbd">Tutorial</span>
+        </li>
+        <li class="palette-item" onclick="window.location.href='https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/how-to/email-draft-sync-and-deliverability.md'">
+          <span>🛡️ View Deliverability Circuit Breaker</span>
+          <span class="kbd">How-To</span>
+        </li>
+        <li class="palette-item" onclick="window.location.href='https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/reference/api-specification.md'">
+          <span>📖 Inspect Machine API Endpoints</span>
+          <span class="kbd">Reference</span>
+        </li>
+        <li class="palette-item" onclick="window.location.href='https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/docs/explanation/architecture-and-design-principles.md'">
+          <span>🏛️ Read 3-Layer System Blueprint</span>
+          <span class="kbd">Explanation</span>
+        </li>
+        <li class="palette-item" onclick="window.location.href='https://github.com/MuzikayiseKhuzwayo/aura-research'">
+          <span>⭐ Star Aura on GitHub</span>
+          <span class="kbd">Repo</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p>
+        Aura Partner Research is open-sourced under the 
+        <a href="https://github.com/MuzikayiseKhuzwayo/aura-research/blob/main/LICENSE">MIT License</a>.
+        Maintained by <a href="https://github.com/MuzikayiseKhuzwayo">Muzikayise Khuzwayo</a>.
+      </p>
+      <p style="margin-top: 8px; font-size: 0.78rem; color: #64748b;">
+        Strictly canonical links • Built with React 19, FastAPI, Uvicorn, and Google Gemini Flash 2.5
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    const leads = [
+      {
+        name: "Alex Thorne",
+        focus: "Active maintainer of Solana micro-billing agents; built high-throughput JSON-RPC settlement pipelines.",
+        asset: "Model Context Protocol (MCP) server & micro-billing adapter",
+        email: "alex@thorne-labs.io",
+        copy: "Subject: Solana agent settlement asset\n\nSaw your work on solana-agent-wallet.\n\nWe built an open-source MCP micro-billing adapter for streaming RPC transactions.\n\nHappy to send over the schema and test scripts if useful for your pipeline."
+      },
+      {
+        name: "Dr. Elena Rostova",
+        focus: "Quantitative researcher building event-driven microstructure models and L2 orderbook reconstruction engines.",
+        asset: "Point-in-time L2 orderbook depth feed (Parquet format)",
+        email: "e.rostova@hyperion-quant.ch",
+        copy: "Subject: L2 orderbook snapshot asset\n\nRead your preprint on microsecond queue dynamics.\n\nWe compiled a point-in-time L2 depth feed covering 40 trading pairs in Parquet format.\n\nOpen to running a sample batch through your backtesting engine?"
+      },
+      {
+        name: "Marcus Vance",
+        focus: "Lead engineer at multi-agent agency; deploying autonomous tools with Gemini and Claude tool-use protocols.",
+        asset: "Autonomous tool execution harness with streaming telemetry",
+        email: "m.vance@agency-synthetic.com",
+        copy: "Subject: Agentic tool execution harness\n\nSaw your multi-agent routing architecture on GitHub.\n\nWe open-sourced an autonomous execution harness with live token-burn telemetry.\n\nGlad to share the repository link if relevant to your current sprint."
+      }
+    ];
+
+    function selectLead(idx) {
+      document.querySelectorAll('.lead-row').forEach((r, i) => {
+        r.classList.toggle('active', i === idx);
+      });
+      const lead = leads[idx];
+      document.getElementById('signal-focus').innerText = lead.focus;
+      document.getElementById('signal-asset').innerText = lead.asset;
+      document.getElementById('signal-email').innerText = lead.email;
+      document.getElementById('composer-text').innerText = lead.copy;
+    }
+
+    function copyDraft() {
+      const text = document.getElementById('composer-text').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Give-First draft copied to clipboard!");
+      });
+    }
+
+    // Command palette handlers
+    function openPalette() {
+      document.getElementById('paletteOverlay').style.display = 'flex';
+      document.getElementById('paletteInput').focus();
+    }
+    function closePalette(e) {
+      if (e.target.id === 'paletteOverlay' || e.key === 'Escape') {
+        document.getElementById('paletteOverlay').style.display = 'none';
+      }
+    }
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openPalette();
+      }
+      if (e.key === 'Escape') {
+        document.getElementById('paletteOverlay').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

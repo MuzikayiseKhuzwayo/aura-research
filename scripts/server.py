@@ -8,9 +8,32 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from google import genai
-from google.genai import types
+
+# Dependency fallback for Google GenAI
+try:
+    from google import genai
+    from google.genai import types
+    GENAI_AVAILABLE = True
+except ImportError:
+    genai = None
+    types = None
+    GENAI_AVAILABLE = False
+    print("Warning: 'google-genai' library not available. AI endpoints running in resilient fallback mode.")
+
+# Import academic research helper
+sys.path.insert(0, os.path.dirname(__file__))
+try:
+    from researcher import search_arxiv, enrich_lead_with_paper
+except ImportError:
+    try:
+        from scripts.researcher import search_arxiv, enrich_lead_with_paper
+    except ImportError:
+        search_arxiv = None
+        enrich_lead_with_paper = None
+        print("Warning: researcher module not available.")
 
 # Active profile tracking (in-memory, defaults to first profile)
 ACTIVE_PROFILE_ID = "default"
@@ -224,6 +247,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static assets
+public_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public"))
+if os.path.exists(public_dir):
+    app.mount("/static", StaticFiles(directory=public_dir), name="static")
+
 # Dynamic segment templates removed to support profile-grounded generations.
 
 # Pydantic models for Profile update
@@ -308,18 +336,136 @@ class RefineProfileRequest(BaseModel):
     targets_icp: str
     business_context: str
 
+class ArxivSearchRequest(BaseModel):
+    query: str
+    max_results: int = 5
+
+class ArxivEnrichRequest(BaseModel):
+    id: str
+    query: str = ""
+
 # Obsolete segment helper removed.
 
 @app.get("/api/leads")
 def get_leads_api():
     return load_leads()
 
+# Lead Export API (CSV & JSON)
+@app.get("/api/leads/export")
+def export_leads(format: str = "csv"):
+    leads = load_leads()
+    global ACTIVE_PROFILE_ID
+    profiles_data = load_profiles_data()
+    active_profile = next((p for p in profiles_data.get("profiles", []) if p["id"] == ACTIVE_PROFILE_ID), None)
+    profile_name = active_profile.get("name", ACTIVE_PROFILE_ID) if active_profile else ACTIVE_PROFILE_ID
+    safe_profile_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in profile_name.lower())
+
+    if format.lower() == "json":
+        json_content = json.dumps(leads, indent=2)
+        return Response(
+            content=json_content,
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename=aura_leads_{safe_profile_name}.json"}
+        )
+    
+    # Export as CSV
+    import io
+    import csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow([
+        "ID", "Name", "Role", "Firm", "Segment", "Location", "Status",
+        "Email", "LinkedIn", "X (Twitter)", "GitHub", "Website",
+        "Observed Need", "Sample Dataset / Asset", "Recent Filing / Post",
+        "Pain Points", "Jargon", "Value Proposition", "Custom Notes", "Latest Draft (Email)"
+    ])
+    
+    for l in leads:
+        channels = l.get("channels", {})
+        tech = l.get("technical_signals", {})
+        drafts = l.get("drafts", {})
+        writer.writerow([
+            l.get("id", ""),
+            l.get("name", ""),
+            l.get("role", ""),
+            l.get("firm", ""),
+            l.get("segment", ""),
+            l.get("location", ""),
+            l.get("status", ""),
+            channels.get("email", ""),
+            channels.get("linkedin", ""),
+            channels.get("x", ""),
+            channels.get("github", ""),
+            channels.get("website", ""),
+            tech.get("observed_need", ""),
+            tech.get("sample_dataset_type", ""),
+            tech.get("recent_filing_or_post", ""),
+            tech.get("pain_points", ""),
+            tech.get("jargon", ""),
+            tech.get("value_proposition", ""),
+            l.get("custom_notes", ""),
+            drafts.get("email", "")
+        ])
+    
+    csv_content = output.getvalue()
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=aura_leads_{safe_profile_name}.csv"}
+    )
+
+# Academic Research Endpoints (arXiv)
+@app.post("/api/research/arxiv")
+def search_arxiv_endpoint(req: ArxivSearchRequest):
+    if not search_arxiv:
+        raise HTTPException(status_code=500, detail="Academic researcher module not available.")
+    try:
+        papers = search_arxiv(req.query, max_results=req.max_results)
+        return {"query": req.query, "count": len(papers), "papers": papers}
+    except Exception as e:
+        print(f"Error in arXiv search endpoint: {e}")
+        return {"query": req.query, "count": 0, "papers": [], "error": str(e)}
+
+@app.post("/api/leads/enrich-arxiv")
+def enrich_lead_arxiv_endpoint(req: ArxivEnrichRequest):
+    if not enrich_lead_with_paper:
+        raise HTTPException(status_code=500, detail="Academic researcher module not available.")
+    leads = load_leads()
+    lead = next((l for l in leads if l["id"] == req.id), None)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    global ACTIVE_PROFILE_ID
+    targets_path = get_targets_path(ACTIVE_PROFILE_ID)
+    
+    query = req.query.strip() if req.query else ""
+    if not query:
+        query = lead.get("technical_signals", {}).get("observed_need", "") or lead.get("segment", "")
+        
+    success, msg, paper = enrich_lead_with_paper(targets_path, req.id, query)
+    if not success:
+        raise HTTPException(status_code=400, detail=msg)
+        
+    # Reload leads and append history
+    leads = load_leads()
+    lead = next((l for l in leads if l["id"] == req.id), None)
+    if lead:
+        lead["history"].append({
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "type": "enriched",
+            "channel": "arxiv",
+            "content": f"Enriched with academic paper: {paper.get('title', 'Unknown')}"
+        })
+        save_leads(leads)
+    return {"status": "success", "message": msg, "lead": lead, "paper": paper}
+
 # AI ICP enhancement endpoint
 @app.post("/api/ai/enhance-icp")
 def enhance_icp(req: EnhanceIcpRequest):
     api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return {"enhanced_icp": req.targets_icp + "\n\n(AI Enhancement requires GEMINI_API_KEY in environment)"}
+    if not GENAI_AVAILABLE or not api_key:
+        return {"enhanced_icp": f"{req.targets_icp}\n\n(Note: Rule-based fallback. Provide GEMINI_API_KEY for dynamic AI expansion)"}
     try:
         client = genai.Client(api_key=api_key)
         prompt = (
@@ -342,10 +488,10 @@ def enhance_icp(req: EnhanceIcpRequest):
 @app.post("/api/ai/refine-profile")
 def refine_profile(req: RefineProfileRequest):
     api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
+    if not GENAI_AVAILABLE or not api_key:
         return {
-            "refined_business_context": req.business_context + "\n\n(AI Refinement requires GEMINI_API_KEY in environment)",
-            "refined_targets_icp": req.targets_icp + "\n\n(AI Refinement requires GEMINI_API_KEY in environment)"
+            "refined_business_context": req.business_context or "B2B client solutions and technical intelligence.",
+            "refined_targets_icp": req.targets_icp or "Technical decision makers, engineering leads, and quantitative developers."
         }
     try:
         client = genai.Client(api_key=api_key)
@@ -502,7 +648,7 @@ def update_lead(req: UpdateLeadRequest):
     return {"status": "success"}
 
 def resolve_lead_email_via_grounding(firm_name: str, website: str, api_key: str) -> str:
-    if not api_key or not website:
+    if not GENAI_AVAILABLE or not api_key or not website:
         return ""
     try:
         print(f"Scraping/searching web for contact email of firm '{firm_name}' on website '{website}'...")
@@ -554,7 +700,7 @@ def trigger_research():
 
     # Ask Gemini to rotate search queries if API Key is present
     api_key = os.environ.get("GEMINI_API_KEY")
-    if api_key and ai_queries and quant_queries:
+    if GENAI_AVAILABLE and api_key and ai_queries and quant_queries:
         try:
             print("Prompting Gemini for fresh GitHub search queries...")
             client = genai.Client(api_key=api_key)
@@ -1149,50 +1295,69 @@ def run_synthesis_logic(lead, api_key, leads):
     repo_desc = raw_meta.get("repo_description", lead.get("technical_signals", {}).get("recent_filing_or_post", ""))
     lang = raw_meta.get("primary_language", "Python")
     
-    client = genai.Client(api_key=api_key)
-    system_instruction = (
-        profile.get("system_prompt_synthesis") if profile else 
-        "You are an AI research assistant. Analyze the repository details to synthesize B2B partner insights."
-    )
-    system_instruction += "\nProduce structured B2B intelligence matching the response schema, contextualized around our service context."
-    
-    biz_context = profile.get("business_context", "We provide custom software/data solutions.") if profile else "We provide custom software/data solutions."
-    icp_context = profile.get("targets_icp", "Software developers and agencies") if profile else "Software developers and agencies"
-    give_first = profile.get("give_first_asset", "our custom introductory services") if profile else "our custom introductory services"
-
-    prompt = (
-        f"Our Business Context / Service Offering: '{biz_context}'\n"
-        f"Our Target ICP/Persona Definition: '{icp_context}'\n"
-        f"Our Custom Give-First Asset: '{give_first}'\n\n"
-        f"Recipient Developer/Firm: {lead.get('name')} ({lead.get('firm')})\n"
-        f"Primary Language/Stack: {lang}\n"
-        f"Repository/Business Name: {repo_name}\n"
-        f"Repository/Business Description: {repo_desc}\n\n"
-        f"Determine how this recipient fits our ICP, identify their observed pain points and technical jargon, "
-        f"and formulate a tailored value proposition representing our offering."
-    )
-    
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            temperature=0.7,
-            response_mime_type="application/json",
-            response_schema=LeadIntelligence,
-        )
-    )
-    if response.text:
-        intel = json.loads(response.text)
-        lead["segment"] = intel.get("segment", lead["segment"])
+    if not GENAI_AVAILABLE or not api_key:
+        lead["segment"] = lead.get("segment", "AI Developers & Web3")
         if "technical_signals" not in lead:
             lead["technical_signals"] = {}
-        lead["technical_signals"]["observed_need"] = intel.get("observed_need", lead["technical_signals"].get("observed_need", ""))
-        lead["technical_signals"]["sample_dataset_type"] = intel.get("sample_dataset_type", lead["technical_signals"].get("sample_dataset_type", ""))
-        lead["technical_signals"]["recent_filing_or_post"] = intel.get("recent_filing_or_post", lead["technical_signals"].get("recent_filing_or_post", ""))
-        lead["technical_signals"]["pain_points"] = intel.get("pain_points", "")
-        lead["technical_signals"]["jargon"] = intel.get("jargon", "")
-        lead["technical_signals"]["value_proposition"] = intel.get("value_proposition", "")
+        lead["technical_signals"]["observed_need"] = lead.get("technical_signals", {}).get("observed_need") or f"Developer in {lang} working on {repo_name}."
+        lead["technical_signals"]["sample_dataset_type"] = give_first
+        lead["technical_signals"]["recent_filing_or_post"] = repo_desc[:120] if repo_desc else f"Active repository: {repo_name}"
+        lead["technical_signals"]["pain_points"] = f"Scaling architecture and integration pipelines in {lang}."
+        lead["technical_signals"]["jargon"] = f"{lang}, APIs, workflow automation"
+        lead["technical_signals"]["value_proposition"] = f"Immediate access to {give_first} tailored for {repo_name}."
+        lead["technical_signals"]["synthesized"] = True
+        save_leads(leads)
+        return lead
+        
+    try:
+        client = genai.Client(api_key=api_key)
+        system_instruction = (
+            profile.get("system_prompt_synthesis") if profile else 
+            "You are an AI research assistant. Analyze the repository details to synthesize B2B partner insights."
+        )
+        system_instruction += "\nProduce structured B2B intelligence matching the response schema, contextualized around our service context."
+        
+        biz_context = profile.get("business_context", "We provide custom software/data solutions.") if profile else "We provide custom software/data solutions."
+        icp_context = profile.get("targets_icp", "Software developers and agencies") if profile else "Software developers and agencies"
+        give_first = profile.get("give_first_asset", "our custom introductory services") if profile else "our custom introductory services"
+
+        prompt = (
+            f"Our Business Context / Service Offering: '{biz_context}'\n"
+            f"Our Target ICP/Persona Definition: '{icp_context}'\n"
+            f"Our Custom Give-First Asset: '{give_first}'\n\n"
+            f"Recipient Developer/Firm: {lead.get('name')} ({lead.get('firm')})\n"
+            f"Primary Language/Stack: {lang}\n"
+            f"Repository/Business Name: {repo_name}\n"
+            f"Repository/Business Description: {repo_desc}\n\n"
+            f"Determine how this recipient fits our ICP, identify their observed pain points and technical jargon, "
+            f"and formulate a tailored value proposition representing our offering."
+        )
+        
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.7,
+                response_mime_type="application/json",
+                response_schema=LeadIntelligence,
+            )
+        )
+        if response.text:
+            intel = json.loads(response.text)
+            lead["segment"] = intel.get("segment", lead["segment"])
+            if "technical_signals" not in lead:
+                lead["technical_signals"] = {}
+            lead["technical_signals"]["observed_need"] = intel.get("observed_need", lead["technical_signals"].get("observed_need", ""))
+            lead["technical_signals"]["sample_dataset_type"] = intel.get("sample_dataset_type", lead["technical_signals"].get("sample_dataset_type", ""))
+            lead["technical_signals"]["recent_filing_or_post"] = intel.get("recent_filing_or_post", lead["technical_signals"].get("recent_filing_or_post", ""))
+            lead["technical_signals"]["pain_points"] = intel.get("pain_points", "")
+            lead["technical_signals"]["jargon"] = intel.get("jargon", "")
+            lead["technical_signals"]["value_proposition"] = intel.get("value_proposition", "")
+            lead["technical_signals"]["synthesized"] = True
+            save_leads(leads)
+    except Exception as e:
+        print(f"Error in Gemini synthesis: {e}")
         lead["technical_signals"]["synthesized"] = True
         save_leads(leads)
     return lead
@@ -1289,7 +1454,7 @@ def generate_outreach(req: GenerateRequest):
 
     generated_text = ""
     api_key = os.environ.get("GEMINI_API_KEY")
-    if api_key:
+    if GENAI_AVAILABLE and api_key:
         try:
             client = genai.Client(api_key=api_key)
             response = client.models.generate_content(

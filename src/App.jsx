@@ -84,7 +84,14 @@ export default function App() {
     recent_bounces: 0,
     locked: false
   });
-  const [fetchingHealth, setFetchingHealth] = useState(false);
+  const [_fetchingHealth, setFetchingHealth] = useState(false);
+
+  // arXiv Academic Research Explorer state
+  const [showArxivModal, setShowArxivModal] = useState(false);
+  const [arxivQuery, setArxivQuery] = useState('');
+  const [arxivResults, setArxivResults] = useState([]);
+  const [searchingArxiv, setSearchingArxiv] = useState(false);
+  const [enrichingArxiv, setEnrichingArxiv] = useState(false);
 
   // Sync settings form state when activeProfileId or profiles updates
   useEffect(() => {
@@ -339,6 +346,57 @@ export default function App() {
       showToast('Error executing crawler. Ensure your internet connection is active.', 'error');
     } finally {
       setResearching(false);
+    }
+  };
+
+  // Search arXiv preprints
+  const handleSearchArxiv = async (e) => {
+    if (e) e.preventDefault();
+    if (!arxivQuery.trim()) return;
+    setSearchingArxiv(true);
+    try {
+      const res = await fetch(`${API_BASE}/research/arxiv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: arxivQuery, max_results: 5 })
+      });
+      if (!res.ok) throw new Error('Search failed');
+      const data = await res.json();
+      setArxivResults(data.papers || []);
+      if (!data.papers || data.papers.length === 0) {
+        showToast('No arXiv preprints found matching query.', 'info');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Error searching arXiv preprints.', 'error');
+    } finally {
+      setSearchingArxiv(false);
+    }
+  };
+
+  // Enrich active lead with selected paper
+  const handleEnrichWithPaper = async (paper) => {
+    if (!selectedLeadId) {
+      showToast('Please select a lead first to enrich.', 'info');
+      return;
+    }
+    setEnrichingArxiv(true);
+    try {
+      const res = await fetch(`${API_BASE}/leads/enrich-arxiv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedLeadId, query: paper.title })
+      });
+      if (!res.ok) throw new Error('Enrichment failed');
+      const data = await res.json();
+      setTargets(prev => prev.map(t => t.id === selectedLeadId ? data.lead : t));
+      showToast(`Enriched target with academic paper: "${paper.title}"!`, 'success');
+      setShowArxivModal(false);
+    } catch (err) {
+      console.error(err);
+      showToast('Error enriching target with paper.', 'error');
+    } finally {
+      setEnrichingArxiv(false);
     }
   };
 
@@ -772,6 +830,43 @@ export default function App() {
               <button id="btn-refresh-leads" className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => fetchLeads(true)}>
                 Refresh Leads
               </button>
+              <button 
+                id="btn-arxiv-research"
+                className="btn-secondary" 
+                onClick={() => {
+                  if (selectedLead && !arxivQuery) {
+                    const fallbackQ = selectedLead.technical_signals?.observed_need || selectedLead.segment || selectedLead.firm || '';
+                    setArxivQuery(fallbackQ.slice(0, 40));
+                  }
+                  setShowArxivModal(true);
+                }}
+                style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                title="Search arXiv preprints & enrich active lead"
+              >
+                <span>📚</span> arXiv Research
+              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <a 
+                  id="btn-export-csv"
+                  href={`${API_BASE}/leads/export?format=csv`}
+                  download
+                  className="btn-secondary"
+                  style={{ fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  title="Download leads as CSV"
+                >
+                  <span>⬇️</span> CSV
+                </a>
+                <a 
+                  id="btn-export-json"
+                  href={`${API_BASE}/leads/export?format=json`}
+                  download
+                  className="btn-secondary"
+                  style={{ fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  title="Download leads as JSON"
+                >
+                  <span>⬇️</span> JSON
+                </a>
+              </div>
             </div>
           )}
         </header>
@@ -1213,6 +1308,140 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* arXiv Academic Research Modal */}
+      {showArxivModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+          onClick={() => setShowArxivModal(false)}
+        >
+          <div 
+            className="glass"
+            style={{
+              maxWidth: '750px',
+              width: '100%',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📚</span> Academic Research Explorer (arXiv)
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Search preprints and enrich {selectedLead ? `"${selectedLead.name}"` : 'selected lead'} with academic proof points.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowArxivModal(false)}
+                className="btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '0.85rem' }}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSearchArxiv} style={{ display: 'flex', gap: '10px' }}>
+              <input 
+                type="text" 
+                placeholder="Search topic, algorithm, or methodology (e.g., 'causal inference', 'agentic workflows')..."
+                value={arxivQuery}
+                onChange={(e) => setArxivQuery(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                disabled={searchingArxiv || !arxivQuery.trim()}
+                style={{ padding: '10px 18px', fontSize: '0.9rem' }}
+              >
+                {searchingArxiv ? 'Searching...' : 'Search Papers'}
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {arxivResults.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  Enter a research query above to fetch recent preprints directly from arXiv.
+                </div>
+              ) : (
+                arxivResults.map((paper, idx) => (
+                  <div 
+                    key={idx}
+                    style={{
+                      padding: '14px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: '600', color: 'white', lineHeight: '1.4' }}>
+                        {paper.title}
+                      </h4>
+                      <button 
+                        className="btn-primary"
+                        disabled={enrichingArxiv || !selectedLeadId}
+                        onClick={() => handleEnrichWithPaper(paper)}
+                        style={{ fontSize: '0.75rem', padding: '5px 10px', whiteSpace: 'nowrap' }}
+                        title="Inject this paper into lead technical signals and outreach context"
+                      >
+                        {enrichingArxiv ? 'Enriching...' : '+ Enrich Lead'}
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'flex', gap: '14px' }}>
+                      <span>🗓 Published: {paper.published}</span>
+                      {paper.authors && paper.authors.length > 0 && (
+                        <span>✍️ {paper.authors.slice(0, 3).join(', ')}{paper.authors.length > 3 ? ' et al.' : ''}</span>
+                      )}
+                      <a href={paper.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--status-sent)', textDecoration: 'underline' }}>
+                        View on arXiv ↗
+                      </a>
+                    </div>
+
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {paper.summary}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Container */}
       <div className="aura-toast-container">

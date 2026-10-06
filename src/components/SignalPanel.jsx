@@ -1,11 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Eye, ShieldAlert, Cpu, Mail, Globe, Github, MessageSquare, Check } from './Icons';
+import { useState, useEffect } from 'react';
+import { Eye, ShieldAlert, Cpu, Globe, Github, Mail, MessageSquare } from './Icons';
 
 export default function SignalPanel({ lead, onUpdateNotes, onSynthesize, onUpdateChannels }) {
-  if (!lead) return null;
-
-  const { technical_signals, custom_notes, channels, history } = lead;
-
   const [isEditing, setIsEditing] = useState(false);
   const [editFields, setEditFields] = useState({
     email: '',
@@ -26,6 +22,10 @@ export default function SignalPanel({ lead, onUpdateNotes, onSynthesize, onUpdat
       });
     }
   }, [lead, isEditing]);
+
+  if (!lead) return null;
+
+  const { technical_signals, custom_notes, channels, history } = lead;
 
   const handleFieldChange = (key, val) => {
     setEditFields(prev => ({ ...prev, [key]: val }));
@@ -48,7 +48,7 @@ export default function SignalPanel({ lead, onUpdateNotes, onSynthesize, onUpdat
     try {
       const date = new Date(isoString);
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    } catch (e) {
+    } catch {
       return isoString;
     }
   };

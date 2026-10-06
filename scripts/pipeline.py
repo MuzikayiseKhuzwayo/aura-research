@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Aura Partner Research — GitHub Target Ingestion Pipeline
+Crawls GitHub Search & User APIs to source open-source developers, quantitative researchers,
+and technical targets matching campaign ICP criteria.
+"""
 import os
 import json
 import urllib.request
@@ -6,26 +11,36 @@ import urllib.parse
 import ssl
 import argparse
 
-# Bypass SSL verification locally
-ssl._create_default_https_context = ssl._create_unverified_context
+# Configure SSL context for local environments
+try:
+    ssl_context = ssl._create_unverified_context()
+except Exception:
+    ssl_context = None
 
-# Helper to fetch URL JSON safely
 def fetch_json(url, headers=None):
+    """Helper to fetch URL JSON safely with timeout and SSL fallback."""
     if headers is None:
         headers = {}
+    if "User-Agent" not in headers:
+        headers["User-Agent"] = "Aura-Partner-Research-Pipeline/2.0"
+        
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req) as response:
-            return json.loads(response.read().decode('utf-8'))
+        if ssl_context:
+            with urllib.request.urlopen(req, context=ssl_context, timeout=12) as response:
+                return json.loads(response.read().decode('utf-8'))
+        else:
+            with urllib.request.urlopen(req, timeout=12) as response:
+                return json.loads(response.read().decode('utf-8'))
     except Exception as e:
         print(f"Error fetching JSON from {url}: {e}")
         return None
 
-# Discover Developers from GitHub
 def discover_developers(segment, queries):
+    """Discover developers from GitHub based on segment and topic queries."""
     print(f"Querying GitHub API for {segment} using queries: {queries}")
     leads = []
-    headers = {"User-Agent": "Dubstrata-ABM-Pipeline"}
+    headers = {"User-Agent": "Aura-Partner-Research-Pipeline/2.0"}
     
     for query in queries:
         if not query.strip():
@@ -50,7 +65,7 @@ def discover_developers(segment, queries):
                 continue
                 
             real_name = user_data.get('name') or owner_login
-            location = user_data.get('location') or "Global / Web3"
+            location = user_data.get('location') or "Global / Remote"
             email = user_data.get('email') or ""
             twitter = user_data.get('twitter_username') or ""
             blog = user_data.get('blog') or ""
@@ -77,7 +92,7 @@ def discover_developers(segment, queries):
                 },
                 "technical_signals": {
                     "observed_need": f"Active open-source developer on GitHub. Built tools in {query} space.",
-                    "sample_dataset_type": "Model Context Protocol (MCP) server & Solana USDC micro-billing setup" if segment == "AI Developers & Web3" else "Point-in-time geopolitical and supply chain risk feed (Parquet format)",
+                    "sample_dataset_type": "Model Context Protocol (MCP) server & micro-billing setup" if segment == "AI Developers & Web3" else "Point-in-time market risk & orderbook feed (Parquet format)",
                     "recent_filing_or_post": f"Created repository '{owner_login}/{repo_name}' with {stars} stars. Desc: {description[:120]}..."
                 },
                 "status": "Ready",
@@ -100,7 +115,8 @@ def discover_developers(segment, queries):
             
     return leads
 
-def run_ingestion(override_ai_queries=None, override_quant_queries=None):
+def run_ingestion(override_ai_queries=None, override_quant_queries=None, targets_path="data/targets.json"):
+    """Runs developer discovery across configured queries and performs a non-destructive CRM merge."""
     all_leads = []
     
     # AI/Web3 developer search queries
@@ -141,16 +157,15 @@ def run_ingestion(override_ai_queries=None, override_quant_queries=None):
         
     if not all_leads:
         print("No leads fetched from APIs.")
-        return
+        return []
 
     # Load existing database if available to perform a non-destructive merge
-    targets_path = "data/targets.json"
     existing_leads = []
     if os.path.exists(targets_path):
         try:
             with open(targets_path, "r", encoding="utf-8") as f:
                 existing_leads = json.load(f)
-            print(f"Loaded {len(existing_leads)} existing targets for merging.")
+            print(f"Loaded {len(existing_leads)} existing targets for merging from {targets_path}.")
         except Exception as e:
             print(f"Error reading existing targets: {e}. Starting fresh.")
             existing_leads = []
@@ -195,11 +210,13 @@ def run_ingestion(override_ai_queries=None, override_quant_queries=None):
     print(f"Pipeline completed. Total leads in database: {len(merged_leads)}.")
     print(f"-> Added {new_count} new leads.")
     print(f"-> Updated metadata for {updated_count} existing leads (protected CRM states).")
+    return merged_leads
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="GitHub Target Ingestion Pipeline")
+    parser = argparse.ArgumentParser(description="Aura Partner Research — GitHub Target Ingestion Pipeline")
     parser.add_argument("--ai-queries", type=str, help="JSON-encoded array of AI search queries")
     parser.add_argument("--quant-queries", type=str, help="JSON-encoded array of Quant search queries")
+    parser.add_argument("--targets-path", type=str, default="data/targets.json", help="Path to write/merge targets")
     args = parser.parse_args()
     
     override_ai = None
@@ -219,4 +236,4 @@ if __name__ == "__main__":
             print(f"Error parsing --quant-queries JSON: {e}")
             override_quant = [q.strip() for q in args.quant_queries.split(",") if q.strip()]
             
-    run_ingestion(override_ai_queries=override_ai, override_quant_queries=override_quant)
+    run_ingestion(override_ai_queries=override_ai, override_quant_queries=override_quant, targets_path=args.targets_path)

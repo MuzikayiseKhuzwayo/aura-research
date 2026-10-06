@@ -1,5 +1,5 @@
-# Logs
-logs
+# Logs & runtime telemetry
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,29 +7,43 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Node modules & builds
-node_modules
-dist
-dist-ssr
+# Node dependencies & production builds
+node_modules/
+dist/
+dist-ssr/
 *.local
 
-# Environment variables
+# Environment variables & secrets
 .env
+.env.*
+!.env.example
 
-# Large datasets and caches
-data.csv
-misc/data.csv
-__pycache__
-*.pyc
+# Datasets, caches & Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.csv
+*.parquet
 data/
+!data/profiles.example.json
+.pytest_cache/
+.coverage
+htmlcov/
 
-# Editor directories and files
+# Editor & OS artifacts
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+scratch/
+
+# Showcase & documentation whitelist tracking
+!public/
+!docs/
+!showcase/

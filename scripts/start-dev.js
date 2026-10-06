@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-console.log('Starting Dubstrata local backend and frontend dev servers...');
+console.log('Starting Aura Partner Research local backend and frontend dev servers...');
 
 // Clean up any orphaned processes on port 8000 to avoid winerror 10048
 try {
